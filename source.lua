@@ -3296,6 +3296,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local hasLoading = (Settings.LoadingTitle and Settings.LoadingTitle ~= "") or (Settings.LoadingSubtitle and Settings.LoadingSubtitle ~= "")
 
 	if hasLoading then
+		-- block hide and minimize until the loading card has expanded,
+		-- otherwise the delayed expansion would fight the pill morph
+		morphing = true
 		local LOAD_W, LOAD_H = 320, 140
 		window.Size = UDim2.fromOffset(LOAD_W, LOAD_H)
 		root.Position = UDim2.new(0.5, 0, 0.5, -math.floor(LOAD_H / 2) - 9)
@@ -3342,7 +3345,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		task.spawn(function()
 			task.wait(1.15)
-			if destroyed or not window.Parent then return end
+			if destroyed or not window.Parent then
+				morphing = false
+				return
+			end
 			tween(loading, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
 			for _, child in ipairs(loading:GetChildren()) do
 				if child:IsA("TextLabel") then
@@ -3358,6 +3364,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			task.wait(0.18)
 			tween(main, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
 			tween(handle, TI_SLOW, {BackgroundTransparency = 0.35})
+			task.wait(0.34)
+			morphing = false
 		end)
 	else
 		window.Size = UDim2.fromOffset(WINDOW_W - 48, WINDOW_H - 56)
