@@ -19,6 +19,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local TextService = game:GetService("TextService")
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 
@@ -26,7 +27,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- executor environment shims
 
-local useStudio = game:GetService("RunService"):IsStudio()
+local useStudio = RunService:IsStudio()
 
 local fsAvailable = (writefile and readfile and isfile and isfolder and makefolder) and true or false
 
@@ -1366,6 +1367,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local searchOpen = false
 	local morphing = false
 	local storedPosition = nil
+	local unlockCursor = false
+
+	-- keeps the mouse usable in games that lock it to the camera
+	connect(RunService.RenderStepped, function()
+		if unlockCursor and not hidden and not destroyed then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			UserInputService.MouseIconEnabled = true
+		end
+	end)
 
 	local function layoutSearch(open)
 		searchOpen = open
@@ -1397,10 +1407,22 @@ function RayfieldLibrary:CreateWindow(Settings)
 			if item:IsA("GuiObject") then
 				local searchName = item:GetAttribute("SearchName")
 				local structural = item:GetAttribute("Structural")
+				local composite = item:GetAttribute("Composite")
 				if query == "" then
 					item.Visible = true
 				elseif structural then
 					item.Visible = false
+				elseif composite then
+					-- rows and columns match when any element inside matches
+					local matched = false
+					for _, d in ipairs(item:GetDescendants()) do
+						local sn = d:GetAttribute("SearchName")
+						if sn and string.find(string.lower(sn), query, 1, true) then
+							matched = true
+							break
+						end
+					end
+					item.Visible = matched
 				elseif searchName then
 					item.Visible = string.find(string.lower(searchName), query, 1, true) ~= nil
 				end
@@ -1580,10 +1602,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 	end
 
 	-- Tab API
+	-- compact mode is used inside rows and columns: descriptions are
+	-- skipped, buttons center their content, sliders stack vertically and
+	-- stat cards use the small pill layout
 
-	local function buildTabAPI(page)
+	local function buildTabAPI(page, compact)
 		local Tab = {}
 		Tab.Page = page
+
+		local function descFor(card, text)
+			if compact then return nil end
+			return makeDescription(page, card, text)
+		end
 
 		function Tab:CreateSection(sectionName)
 			local holder = create("Frame", {
@@ -1709,9 +1739,77 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return ParagraphValue
 		end
 
-		-- Gen2 stat card, the green gradient one
+		-- Gen2 stat card, the green gradient one. full width shows a big
+		-- value line, inside rows and columns it becomes a small pill with
+		-- the value on the right
 		function Tab:CreateStat(StatSettings)
 			StatSettings = StatSettings or {}
+			if compact then
+				local card = create("Frame", {
+					Size = UDim2.new(1, 0, 0, 50),
+					LayoutOrder = nextOrder(),
+					Parent = page,
+				})
+				card:SetAttribute("SearchName", StatSettings.Name or "")
+				card.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				round(card, 14)
+				create("UIGradient", {
+					Rotation = 112,
+					Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Theme.AccentSoft),
+						ColorSequenceKeypoint.new(0.55, Theme.Accent),
+						ColorSequenceKeypoint.new(1, Theme.AccentDark),
+					}),
+					Parent = card,
+				})
+				local textX = 16
+				if StatSettings.Icon then
+					local ic = makeIcon(card, StatSettings.Icon, 18, Color3.fromRGB(240, 252, 246))
+					if ic then
+						ic.AnchorPoint = Vector2.new(0, 0.5)
+						ic.Position = UDim2.new(0, 15, 0.5, 0)
+						textX = 42
+					end
+				end
+				local nameLabel = create("TextLabel", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.new(0, textX, 0.5, 0),
+					Size = UDim2.new(0.55, -textX, 0, 18),
+					Font = FONT_BOLD,
+					TextSize = 16,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextColor3 = Color3.fromRGB(244, 253, 248),
+					Text = StatSettings.Name or "",
+					Parent = card,
+				})
+				local rightLabel = create("TextLabel", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, -16, 0.5, 0),
+					Size = UDim2.new(0.4, -16, 0, 18),
+					Font = FONT_BOLD,
+					TextSize = 16,
+					TextXAlignment = Enum.TextXAlignment.Right,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextColor3 = Color3.fromRGB(255, 255, 255),
+					Text = tostring(StatSettings.Value or StatSettings.Delta or ""),
+					Parent = card,
+				})
+				local StatValue = {}
+				local lastValue = StatSettings.Value
+				local lastDelta = StatSettings.Delta
+				function StatValue:Set(newSettings)
+					newSettings = newSettings or {}
+					if newSettings.Name then nameLabel.Text = newSettings.Name end
+					if newSettings.Value ~= nil then lastValue = newSettings.Value end
+					if newSettings.Delta ~= nil then lastDelta = newSettings.Delta end
+					rightLabel.Text = tostring(lastValue or lastDelta or "")
+				end
+				return StatValue
+			end
+
 			local card = create("Frame", {
 				Size = UDim2.new(1, 0, 0, 96),
 				LayoutOrder = nextOrder(),
@@ -1785,8 +1883,51 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		function Tab:CreateButton(ButtonSettings)
 			ButtonSettings = ButtonSettings or {}
-			local card, label = makeCard(page, ButtonSettings.Name, ButtonSettings.Icon, 50)
-			makeDescription(page, card, ButtonSettings.Description)
+			local card, label
+			if compact then
+				-- centered icon and label for row and column cells
+				card = create("Frame", {
+					Size = UDim2.new(1, 0, 0, 50),
+					LayoutOrder = nextOrder(),
+					Parent = page,
+				})
+				card:SetAttribute("SearchName", ButtonSettings.Name or "")
+				paint(card, "BackgroundColor3", "Card")
+				cardBase(card)
+				local center = create("Frame", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Size = UDim2.new(0, 0, 1, 0),
+					Parent = card,
+				})
+				create("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 9),
+					Parent = center,
+				})
+				if ButtonSettings.Icon then
+					local ic = makeIcon(center, ButtonSettings.Icon, 18, Theme.TextTitle, 0.04)
+					if ic then ic.LayoutOrder = 1 end
+				end
+				label = create("TextLabel", {
+					BackgroundTransparency = 1,
+					AutomaticSize = Enum.AutomaticSize.X,
+					Size = UDim2.new(0, 0, 1, 0),
+					Font = FONT_MEDIUM,
+					TextSize = 16,
+					Text = ButtonSettings.Name or "",
+					LayoutOrder = 2,
+					Parent = center,
+				})
+				paint(label, "TextColor3", "TextBody")
+			else
+				card, label = makeCard(page, ButtonSettings.Name, ButtonSettings.Icon, 50)
+				descFor(card, ButtonSettings.Description)
+			end
 			hoverable(card)
 			local clicker = create("TextButton", {
 				BackgroundTransparency = 1,
@@ -1812,7 +1953,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		function Tab:CreateToggle(ToggleSettings)
 			ToggleSettings = ToggleSettings or {}
 			local card = makeCard(page, ToggleSettings.Name, ToggleSettings.Icon, 50)
-			makeDescription(page, card, ToggleSettings.Description)
+			descFor(card, ToggleSettings.Description)
 			hoverable(card)
 
 			-- dark inset track with a large pill knob, per the Gen2 design
@@ -1830,7 +1971,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			track.Parent = card
 
-			local knobGlow = nil
+			-- soft green halo that washes over the card corner when on
+			local trackGlow = softGlow(track, Theme.Accent, 1, 40)
+
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 4, 0.5, 0),
@@ -1843,7 +1986,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
 				Parent = knob,
 			})
-			knobGlow = softGlow(knob, Theme.Accent, 1, 22)
+			local knobGlow = softGlow(knob, Theme.Accent, 1, 22)
 			knob.Parent = track
 
 			local Toggle = {
@@ -1859,6 +2002,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					BackgroundColor3 = on and Theme.Accent or Theme.KnobOff,
 				})
 				tween(knobGlow, info, {ImageTransparency = on and 0.62 or 1})
+				tween(trackGlow, info, {ImageTransparency = on and 0.85 or 1})
 				tween(trackStroke, info, {
 					Color = on and Theme.AccentDark or Color3.fromRGB(255, 255, 255),
 					Transparency = on and 0.55 or 0.86,
@@ -1899,15 +2043,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local increment = SliderSettings.Increment or 1
 			local suffix = SliderSettings.Suffix or ""
 
+			-- full width cards put the track beside the labels, compact
+			-- cells stack the track under them like the two column mockup
 			local card = create("Frame", {
-				Size = UDim2.new(1, 0, 0, 60),
+				Size = UDim2.new(1, 0, 0, compact and 78 or 60),
 				LayoutOrder = nextOrder(),
 				Parent = page,
 			})
 			card:SetAttribute("SearchName", SliderSettings.Name or "")
 			paint(card, "BackgroundColor3", "Card")
 			cardBase(card)
-			makeDescription(page, card, SliderSettings.Description)
+			descFor(card, SliderSettings.Description)
 
 			local textX = 17
 			if SliderSettings.Icon then
@@ -1919,8 +2065,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			end
 			local nameLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(textX, 11),
-				Size = UDim2.new(0.48, -textX, 0, 18),
+				Position = UDim2.fromOffset(textX, compact and 13 or 11),
+				Size = UDim2.new(compact and 0.56 or 0.48, -textX, 0, 18),
 				Font = FONT_MEDIUM,
 				TextSize = 16,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1931,11 +2077,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 			paint(nameLabel, "TextColor3", "TextBody")
 			local valueLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(textX, 32),
-				Size = UDim2.new(0.48, -textX, 0, 16),
+				AnchorPoint = compact and Vector2.new(1, 0) or Vector2.new(0, 0),
+				Position = compact and UDim2.new(1, -16, 0, 15) or UDim2.fromOffset(textX, 32),
+				Size = UDim2.new(compact and 0.4 or 0.48, compact and -16 or -textX, 0, 16),
 				Font = FONT_REGULAR,
 				TextSize = 13,
-				TextXAlignment = Enum.TextXAlignment.Left,
+				TextXAlignment = compact and Enum.TextXAlignment.Right or Enum.TextXAlignment.Left,
 				Text = "",
 				Parent = card,
 			})
@@ -1943,13 +2090,23 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			-- dark track, gradient green fill with a soft bloom, glowing
 			-- white pill knob with no ring
-			local track = create("Frame", {
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -17, 0.5, 0),
-				Size = UDim2.new(0.46, 0, 0, 20),
-				BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-				BackgroundTransparency = 0.25,
-			})
+			local track
+			if compact then
+				track = create("Frame", {
+					Position = UDim2.fromOffset(15, 43),
+					Size = UDim2.new(1, -30, 0, 20),
+					BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+					BackgroundTransparency = 0.25,
+				})
+			else
+				track = create("Frame", {
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, -17, 0.5, 0),
+					Size = UDim2.new(0.46, 0, 0, 20),
+					BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+					BackgroundTransparency = 0.25,
+				})
+			end
 			roundFull(track)
 			track.Parent = card
 
@@ -2072,7 +2229,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		function Tab:CreateInput(InputSettings)
 			InputSettings = InputSettings or {}
 			local card = makeCard(page, InputSettings.Name, InputSettings.Icon, 50)
-			makeDescription(page, card, InputSettings.Description)
+			descFor(card, InputSettings.Description)
 			hoverable(card)
 
 			local boxHolder = create("Frame", {
@@ -2469,7 +2626,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		function Tab:CreateKeybind(KeybindSettings)
 			KeybindSettings = KeybindSettings or {}
 			local card = makeCard(page, KeybindSettings.Name, KeybindSettings.Icon, 50)
-			makeDescription(page, card, KeybindSettings.Description)
+			descFor(card, KeybindSettings.Description)
 			hoverable(card)
 
 			local keyHolder = create("Frame", {
@@ -2769,6 +2926,84 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return ColorPicker
 		end
 
+		-- a horizontal strip of elements sharing the width equally.
+		-- returns a Tab style API in compact mode, so
+		-- local Row = Tab:CreateRow() then Row:CreateToggle({...})
+		function Tab:CreateRow()
+			local rowFrame = create("Frame", {
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, 0, 0, 50),
+				LayoutOrder = nextOrder(),
+				Parent = page,
+			})
+			rowFrame:SetAttribute("Composite", true)
+			create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+				Parent = rowFrame,
+			})
+			local function recompute()
+				local kids = {}
+				for _, c in ipairs(rowFrame:GetChildren()) do
+					if c:IsA("GuiObject") then table.insert(kids, c) end
+				end
+				local n = #kids
+				if n == 0 then return end
+				local adj = math.floor(8 * (n - 1) / n + 0.5)
+				for _, c in ipairs(kids) do
+					c.Size = UDim2.new(1 / n, -adj, 0, c.Size.Y.Offset)
+				end
+			end
+			rowFrame.ChildAdded:Connect(function()
+				task.defer(recompute)
+			end)
+			return buildTabAPI(rowFrame, true)
+		end
+
+		-- splits the page into vertical columns, each with the full element
+		-- API in compact mode:
+		-- local Left, Right = Tab:CreateColumns(2)
+		function Tab:CreateColumns(count)
+			count = math.clamp(count or 2, 1, 4)
+			local container = create("Frame", {
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, 0, 0, 0),
+				LayoutOrder = nextOrder(),
+				Parent = page,
+			})
+			container:SetAttribute("Composite", true)
+			create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 10),
+				Parent = container,
+			})
+			local apis = {}
+			local adj = math.floor(10 * (count - 1) / count + 0.5)
+			for i = 1, count do
+				local column = create("Frame", {
+					BackgroundTransparency = 1,
+					AutomaticSize = Enum.AutomaticSize.Y,
+					Size = UDim2.new(1 / count, -adj, 0, 0),
+					LayoutOrder = i,
+					Parent = container,
+				})
+				create("UIListLayout", {
+					FillDirection = Enum.FillDirection.Vertical,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 8),
+					Parent = column,
+				})
+				table.insert(apis, buildTabAPI(column, true))
+			end
+			return table.unpack(apis)
+		end
+
 		return Tab
 	end
 
@@ -2873,6 +3108,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 			CallOnChange = true,
 			Callback = function(newKey)
 				toggleKeyName = newKey
+			end,
+		})
+		SettingsTab:CreateToggle({
+			Name = "Unlock cursor while open",
+			Icon = "mouse-pointer-2",
+			CurrentValue = false,
+			Description = "Unlocks the cursor while the menu is open so you can configure in FPS games that lock it.",
+			Callback = function(value)
+				unlockCursor = value
 			end,
 		})
 		SettingsTab:CreateSection("Configuration")

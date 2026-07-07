@@ -149,6 +149,25 @@ local Stat = Tab:CreateStat({
 Stat:Set({Value = "$40", Delta = "+90%"})
 ```
 
+### Rows and columns (new in Gen 2)
+
+Rows place elements side by side with equal widths. Columns split the page into
+vertical stacks. Both return the same element API as a tab, in a compact style:
+buttons center their content, sliders stack the track under the labels, stat
+cards become small pills, and descriptions are skipped.
+
+```lua
+local Row = Tab:CreateRow()
+Row:CreateToggle({Name = "ESP", CurrentValue = true, Callback = function(v) end})
+Row:CreateButton({Name = "Save", Icon = "save", Callback = function() end})
+Row:CreateStat({Name = "Kills", Icon = "chart-no-axes-column", Value = "128"})
+
+local Left, Right = Tab:CreateColumns(2)
+Left:CreateToggle({Name = "Aimbot", CurrentValue = false, Callback = function(v) end})
+Left:CreateSlider({Name = "Smoothing", Range = {0, 100}, CurrentValue = 40, Suffix = "%", Callback = function(v) end})
+Right:CreateDropdown({Name = "ESP Color", Options = {"Green", "Red"}, CurrentOption = {"Green"}, Callback = function(o) end})
+```
+
 ## Notifications
 
 ```lua
@@ -193,8 +212,9 @@ Rayfield:Destroy()
 ```
 
 The gear icon in the header opens a built in settings page where the user can rebind
-the toggle key or unload the interface. The dash minimizes to a bar, the X hides to
-the pill, and the search icon filters the current tab.
+the toggle key, unlock the cursor for FPS games that lock it, or unload the
+interface. The dash minimizes to a bar, the X hides to the pill, and the search icon
+filters the current tab.
 
 ## Icons
 

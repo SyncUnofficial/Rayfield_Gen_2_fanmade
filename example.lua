@@ -20,6 +20,7 @@ local Window = Rayfield:CreateWindow({
 
 local Home = Window:CreateTab("Home", "house")
 local Numbers = Window:CreateTab("Numbers", "chart-no-axes-column")
+local Layout = Window:CreateTab("Layout", "layout-grid")
 
 Home:CreateSection("Gameplay")
 
@@ -143,6 +144,120 @@ Numbers:CreateDropdown({
 	Flag = "DemoDropdown",
 	Callback = function(selection)
 		print("Selected:", table.concat(selection, ", "))
+	end,
+})
+
+Layout:CreateSection("Main")
+
+local TopRow = Layout:CreateRow()
+TopRow:CreateToggle({
+	Name = "Switch",
+	Icon = "messages-square",
+	CurrentValue = false,
+	Flag = "RowSwitch",
+	Callback = function(value)
+		print("Row switch:", value)
+	end,
+})
+TopRow:CreateButton({
+	Name = "Button",
+	Icon = "sparkles",
+	Callback = function()
+		print("Row button pressed")
+	end,
+})
+
+local StatRow = Layout:CreateRow()
+local Money = StatRow:CreateStat({
+	Name = "Money",
+	Icon = "messages-square",
+	Delta = "+19%",
+})
+StatRow:CreateButton({
+	Name = "Play",
+	Icon = "sparkles",
+	Callback = function()
+		Money:Set({Delta = "+" .. tostring(math.random(1, 40)) .. "%"})
+	end,
+})
+
+Layout:CreateSection("Row")
+
+local TripleRow = Layout:CreateRow()
+TripleRow:CreateButton({
+	Name = "Save",
+	Icon = "layout-panel-left",
+	Callback = function()
+		print("Saved")
+	end,
+})
+TripleRow:CreateToggle({
+	Name = "ESP",
+	CurrentValue = true,
+	Flag = "RowESP",
+	Callback = function(value)
+		print("ESP:", value)
+	end,
+})
+local Kills = TripleRow:CreateStat({
+	Name = "Kills",
+	Icon = "chart-no-axes-column",
+	Value = "128",
+})
+
+Layout:CreateSection("Two columns")
+
+local Left, Right = Layout:CreateColumns(2)
+Left:CreateToggle({
+	Name = "Aimbot",
+	CurrentValue = false,
+	Flag = "Aimbot",
+	Callback = function(value)
+		print("Aimbot:", value)
+	end,
+})
+Left:CreateToggle({
+	Name = "Triggerbot",
+	CurrentValue = false,
+	Flag = "Triggerbot",
+	Callback = function(value)
+		print("Triggerbot:", value)
+	end,
+})
+Left:CreateSlider({
+	Name = "Smoothing",
+	Range = {0, 100},
+	Increment = 1,
+	Suffix = "%",
+	CurrentValue = 40,
+	Flag = "Smoothing",
+	Callback = function(value)
+		print("Smoothing:", value)
+	end,
+})
+Right:CreateToggle({
+	Name = "ESP Boxes",
+	CurrentValue = true,
+	Flag = "ESPBoxes",
+	Callback = function(value)
+		print("ESP Boxes:", value)
+	end,
+})
+Right:CreateToggle({
+	Name = "ESP Names",
+	CurrentValue = false,
+	Flag = "ESPNames",
+	Callback = function(value)
+		print("ESP Names:", value)
+	end,
+})
+Right:CreateDropdown({
+	Name = "ESP Color",
+	Options = {"Green", "Red", "Blue", "White"},
+	CurrentOption = {"Green"},
+	Flag = "ESPColor",
+	Callback = function(selection)
+		print("ESP Color:", table.concat(selection, ", "))
 	end,
 })
 
