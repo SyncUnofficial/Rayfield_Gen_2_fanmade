@@ -8,6 +8,8 @@ local Window = Rayfield:CreateWindow({
 	Subtitle = "Rayfield Gen2",
 	Icon = "shell",
 	Badge = {Text = "us-en", Icon = "messages-square"},
+	LoadingTitle = "Example",
+	LoadingSubtitle = "by Rayfield Gen2",
 	ToggleUIKeybind = "K",
 	ConfigurationSaving = {
 		Enabled = true,

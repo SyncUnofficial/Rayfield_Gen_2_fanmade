@@ -5,10 +5,11 @@
 	Keeps the original Rayfield API so most existing scripts drop in:
 	CreateWindow, CreateTab, CreateSection, CreateButton, CreateToggle,
 	CreateSlider, CreateInput, CreateDropdown, CreateKeybind, CreateLabel,
-	CreateParagraph, CreateColorPicker, Notify, Flags, config saving.
+	CreateParagraph, CreateColorPicker, Notify, Flags, config saving,
+	key system, loading screen.
 
 	Gen 2 additions: header badge, search that filters elements, stat cards,
-	hide-to-pill animation, minimize to bar, sign in toast.
+	hide to pill animation, minimize to bar, sign in toast.
 
 	Original Rayfield by Sirius (sirius.menu). This project is not
 	affiliated with or endorsed by them.
@@ -17,12 +18,14 @@
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
+local TextService = game:GetService("TextService")
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
 -- executor environment shims
+
 local useStudio = game:GetService("RunService"):IsStudio()
 
 local fsAvailable = (writefile and readfile and isfile and isfolder and makefolder) and true or false
@@ -51,6 +54,28 @@ local function ensureFolder(path)
 	return ok
 end
 
+local BASE_FOLDER = "Rayfield Gen2"
+ensureFolder(BASE_FOLDER)
+
+local function httpGet(url)
+	local ok, result = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and type(result) == "string" and #result > 0 then
+		return result
+	end
+	local ok2, result2 = pcall(function()
+		local req = (syn and syn.request) or request or http_request
+		if not req then return nil end
+		local response = req({Url = url, Method = "GET"})
+		return response and response.Body or nil
+	end)
+	if ok2 and type(result2) == "string" and #result2 > 0 then
+		return result2
+	end
+	return nil
+end
+
 local function getGuiParent()
 	if useStudio then
 		return LocalPlayer:WaitForChild("PlayerGui")
@@ -68,31 +93,29 @@ local function getGuiParent()
 	return LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- theme -----------------------------------------------------------------
+-- theme
 
 local Theme = {
-	Background       = Color3.fromRGB(16, 16, 16),
-	BackgroundEnd    = Color3.fromRGB(11, 11, 11),
-	Card             = Color3.fromRGB(29, 29, 29),
-	CardHover        = Color3.fromRGB(38, 38, 38),
-	CardSelected     = Color3.fromRGB(46, 46, 46),
+	Background       = Color3.fromRGB(20, 20, 20),
+	Card             = Color3.fromRGB(31, 31, 31),
+	CardHover        = Color3.fromRGB(39, 39, 39),
+	CardSelected     = Color3.fromRGB(48, 48, 48),
 	CardInset        = Color3.fromRGB(24, 24, 24),
-	SearchBox        = Color3.fromRGB(43, 43, 43),
-	Stroke           = Color3.fromRGB(44, 44, 44),
-	TextTitle        = Color3.fromRGB(245, 245, 245),
-	TextBody         = Color3.fromRGB(232, 232, 232),
-	TextSub          = Color3.fromRGB(154, 154, 154),
-	TextMuted        = Color3.fromRGB(117, 117, 117),
-	AccentDark       = Color3.fromRGB(30, 88, 61),
-	Accent           = Color3.fromRGB(62, 156, 111),
-	AccentSoft       = Color3.fromRGB(95, 191, 143),
-	AccentText       = Color3.fromRGB(169, 232, 200),
-	Knob             = Color3.fromRGB(245, 245, 245),
-	KnobOff          = Color3.fromRGB(84, 84, 84),
-	ToggleOff        = Color3.fromRGB(46, 46, 46),
+	SearchBox        = Color3.fromRGB(44, 44, 44),
+	Stroke           = Color3.fromRGB(255, 255, 255),
+	TextTitle        = Color3.fromRGB(247, 247, 247),
+	TextBody         = Color3.fromRGB(233, 233, 233),
+	TextSub          = Color3.fromRGB(152, 152, 152),
+	TextMuted        = Color3.fromRGB(110, 110, 110),
+	AccentDark       = Color3.fromRGB(54, 104, 80),
+	Accent           = Color3.fromRGB(70, 168, 120),
+	AccentSoft       = Color3.fromRGB(104, 210, 156),
+	Knob             = Color3.fromRGB(255, 255, 255),
+	KnobOff          = Color3.fromRGB(70, 70, 70),
+	ToggleTrack      = Color3.fromRGB(16, 16, 16),
 	BadgeBackground  = Color3.fromRGB(240, 166, 63),
 	BadgeText        = Color3.fromRGB(66, 45, 15),
-	NotifyBackground = Color3.fromRGB(18, 18, 18),
+	NotifyBackground = Color3.fromRGB(16, 16, 16),
 }
 
 local painted = {}
@@ -111,7 +134,7 @@ local function repaint()
 	end
 end
 
--- instance helpers ------------------------------------------------------
+-- instance helpers
 
 local function create(class, props, children)
 	local inst = Instance.new(class)
@@ -142,17 +165,6 @@ local function roundFull(inst)
 	return create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = inst})
 end
 
-local function strokeOn(inst, colorKey, transparency, thickness)
-	local s = create("UIStroke", {
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		Transparency = transparency or 0.5,
-		Thickness = thickness or 1,
-		Parent = inst,
-	})
-	paint(s, "Color", colorKey or "Stroke")
-	return s
-end
-
 local function padAll(inst, top, right, bottom, left)
 	return create("UIPadding", {
 		PaddingTop = UDim.new(0, top or 0),
@@ -160,6 +172,26 @@ local function padAll(inst, top, right, bottom, left)
 		PaddingBottom = UDim.new(0, bottom or 0),
 		PaddingLeft = UDim.new(0, left or 0),
 		Parent = inst,
+	})
+end
+
+-- soft blurred glow or shadow behind an element, 9 slice
+local GLOW_IMAGE = "rbxassetid://6014261993"
+
+local function softGlow(parent, color, transparency, spread, zindex)
+	return create("ImageLabel", {
+		Name = "Glow",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(1, spread, 1, spread),
+		Image = GLOW_IMAGE,
+		ImageColor3 = color,
+		ImageTransparency = transparency,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(49, 49, 450, 450),
+		ZIndex = zindex or 0,
+		Parent = parent,
 	})
 end
 
@@ -175,10 +207,11 @@ do
 	end
 end
 
-local TI_FAST = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local TI_MED = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local TI_MORPH = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local TI_SLOW = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local TI_FAST = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local TI_MED = TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local TI_SMOOTH = TweenInfo.new(0.32, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local TI_MORPH = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local TI_SLOW = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 local function tween(inst, info, props)
 	local t = TweenService:Create(inst, info, props)
@@ -186,23 +219,69 @@ local function tween(inst, info, props)
 	return t
 end
 
--- icons ------------------------------------------------------------------
+local function measureText(text, size, font)
+	local ok, result = pcall(function()
+		return TextService:GetTextSize(text, size, font, Vector2.new(1000, 100))
+	end)
+	if ok then return result end
+	return Vector2.new(#text * size * 0.5, size)
+end
+
+-- icons
+-- lucide icons through the same generated index original Rayfield uses.
+-- the index is an older lucide set, so newer names are mapped back through
+-- aliases. the index is cached to disk so icons work offline after one run.
 
 local Icons = nil
-task.spawn(function()
-	local ok, result = pcall(function()
-		return loadstring(game:HttpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua"))()
-	end)
-	if ok and type(result) == "table" then
-		Icons = result
-	end
-end)
+local pendingIcons = {}
+
+local ICON_ALIASES = {
+	["house"] = {"home"},
+	["home"] = {"house"},
+	["chart-no-axes-column"] = {"bar-chart-3", "bar-chart"},
+	["chart-no-axes-column-increasing"] = {"bar-chart-3", "bar-chart"},
+	["chart-column"] = {"bar-chart-2"},
+	["chart-bar"] = {"bar-chart-horizontal"},
+	["chart-line"] = {"line-chart"},
+	["triangle-alert"] = {"alert-triangle"},
+	["circle-alert"] = {"alert-circle"},
+	["circle-check"] = {"check-circle", "check-circle-2"},
+	["circle-x"] = {"x-circle"},
+	["circle-help"] = {"help-circle"},
+	["square-check"] = {"check-square"},
+	["square-pen"] = {"pen-square", "edit"},
+	["ellipsis"] = {"more-horizontal"},
+	["ellipsis-vertical"] = {"more-vertical"},
+	["wand-sparkles"] = {"wand-2"},
+	["trash"] = {"trash-2"},
+	["maximize"] = {"maximize-2"},
+	["minimize"] = {"minimize-2"},
+	["grip"] = {"grip-horizontal"},
+	["user-round"] = {"user-circle-2", "user"},
+	["users-round"] = {"users"},
+	["loader-pinwheel"] = {"loader"},
+	["loader-circle"] = {"loader-2"},
+	["key"] = {"key-round"},
+	["key-round"] = {"key"},
+}
+
+local warnedIcons = {}
 
 local function getLucide(name)
 	if not Icons then return nil end
 	local sized = Icons["48px"]
 	if not sized then return nil end
-	local entry = sized[string.lower(name)]
+	name = string.lower(name)
+	local entry = sized[name]
+	if not entry then
+		local aliases = ICON_ALIASES[name]
+		if aliases then
+			for _, alias in ipairs(aliases) do
+				entry = sized[alias]
+				if entry then break end
+			end
+		end
+	end
 	if not entry then return nil end
 	if type(entry[1]) ~= "number" then return nil end
 	return {
@@ -212,17 +291,103 @@ local function getLucide(name)
 	}
 end
 
-local function firstLucide(names)
-	for _, name in ipairs(names) do
-		local found = getLucide(name)
-		if found then return found end
+local function loadIcons()
+	local cachePath = BASE_FOLDER .. "/icons_cache.lua"
+	local source = safeReadFile(cachePath)
+	local fresh = false
+	if not source then
+		source = httpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
+		fresh = true
 	end
-	return nil
+	if not source then return end
+	local ok, result = pcall(function()
+		local chunk = loadstring(source)
+		return chunk and chunk() or nil
+	end)
+	if ok and type(result) == "table" and result["48px"] then
+		Icons = result
+		if fresh then
+			safeWriteFile(cachePath, source)
+		end
+	elseif not fresh then
+		-- stale or corrupted cache, refetch once
+		source = httpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
+		if source then
+			local ok2, result2 = pcall(function()
+				local chunk = loadstring(source)
+				return chunk and chunk() or nil
+			end)
+			if ok2 and type(result2) == "table" and result2["48px"] then
+				Icons = result2
+				safeWriteFile(cachePath, source)
+			end
+		end
+	end
 end
 
--- makes an ImageLabel for an icon which may be a lucide name or asset id.
--- lucide icons may still be downloading when UI builds, so string icons
--- retry for a short while before giving up.
+loadIcons()
+
+local function flushPendingIcons()
+	if not Icons then return end
+	for _, entry in ipairs(pendingIcons) do
+		if entry.img and entry.img.Parent then
+			local asset = nil
+			for _, name in ipairs(entry.names) do
+				asset = getLucide(name)
+				if asset then break end
+			end
+			if asset then
+				entry.img.Image = "rbxassetid://" .. tostring(asset.id)
+				entry.img.ImageRectSize = asset.size
+				entry.img.ImageRectOffset = asset.offset
+				if entry.onApplied then entry.onApplied() end
+			end
+		end
+	end
+	pendingIcons = {}
+end
+
+if not Icons then
+	task.spawn(function()
+		for _ = 1, 12 do
+			task.wait(2.5)
+			loadIcons()
+			if Icons then
+				flushPendingIcons()
+				return
+			end
+		end
+	end)
+end
+
+-- applies a lucide icon (accepts a list of candidate names) to an ImageLabel,
+-- deferring until the index is available if needed
+local function applyLucide(img, names, onApplied)
+	if type(names) == "string" then names = {names} end
+	if Icons then
+		for _, name in ipairs(names) do
+			local asset = getLucide(name)
+			if asset then
+				img.Image = "rbxassetid://" .. tostring(asset.id)
+				img.ImageRectSize = asset.size
+				img.ImageRectOffset = asset.offset
+				if onApplied then onApplied() end
+				return true
+			end
+		end
+		local wanted = names[1]
+		if not warnedIcons[wanted] then
+			warnedIcons[wanted] = true
+			warn("Rayfield Gen2 | Unknown icon \"" .. tostring(wanted) .. "\"")
+		end
+		return false
+	end
+	table.insert(pendingIcons, {img = img, names = names, onApplied = onApplied})
+	return false
+end
+
+-- makes an ImageLabel for an icon which may be a lucide name, an asset id
+-- number, or a full rbxassetid string
 local function makeIcon(parent, icon, size, color3, transparency)
 	if icon == nil or icon == 0 or icon == "" then return nil end
 	local img = create("ImageLabel", {
@@ -232,33 +397,19 @@ local function makeIcon(parent, icon, size, color3, transparency)
 		ImageTransparency = transparency or 0,
 		Parent = parent,
 	})
-	local function apply(name)
-		local asset = getLucide(name)
-		if asset then
-			img.Image = "rbxassetid://" .. tostring(asset.id)
-			img.ImageRectSize = asset.size
-			img.ImageRectOffset = asset.offset
-			return true
-		end
-		return false
-	end
 	if type(icon) == "number" then
 		img.Image = "rbxassetid://" .. tostring(icon)
 	elseif type(icon) == "string" then
-		if not apply(icon) then
-			task.spawn(function()
-				for _ = 1, 40 do
-					task.wait(0.25)
-					if not img.Parent then return end
-					if apply(icon) then return end
-				end
-			end)
+		if string.find(icon, "rbxasset") or string.find(icon, "://") then
+			img.Image = icon
+		else
+			applyLucide(img, icon)
 		end
 	end
 	return img
 end
 
--- library ----------------------------------------------------------------
+-- library
 
 local RayfieldLibrary = {
 	Flags = {},
@@ -293,9 +444,8 @@ local function ensureRoot()
 	notifyStack = create("Frame", {
 		Name = "Notifications",
 		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 0),
 		Position = UDim2.fromOffset(24, 24),
-		Size = UDim2.fromOffset(330, 800),
+		Size = UDim2.fromOffset(330, 900),
 		Parent = rootGui,
 	})
 	create("UIListLayout", {
@@ -306,6 +456,8 @@ local function ensureRoot()
 	})
 	return rootGui
 end
+
+-- notifications
 
 local notifyOrder = 0
 
@@ -325,30 +477,29 @@ function RayfieldLibrary:Notify(data)
 	local card = create("Frame", {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Size = UDim2.new(1, 0, 0, 0),
-		Position = UDim2.fromOffset(-360, 0),
-		BackgroundTransparency = 0.02,
+		Position = UDim2.fromOffset(-370, 0),
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
-	round(card, 16)
-	create("UIStroke", {Color = Theme.Stroke, Transparency = 0.65, Parent = card})
+	round(card, 18)
+	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.92, Parent = card})
 	create("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(196, 196, 196)),
+		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(170, 170, 170)),
 		Parent = card,
 	})
-	padAll(card, 14, 16, 14, 16)
+	softGlow(card, Color3.fromRGB(0, 0, 0), 0.6, 38)
+	padAll(card, 15, 18, 15, 16)
 
-	local hasIcon = data.Image ~= nil and data.Image ~= ""
-	local iconHolder = nil
+	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
 	if hasIcon then
-		iconHolder = create("Frame", {
+		local iconHolder = create("Frame", {
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 0, 0.5, 0),
-			Size = UDim2.fromOffset(36, 36),
+			Size = UDim2.fromOffset(38, 38),
 			Parent = card,
 		})
-		local icon = makeIcon(iconHolder, data.Image, 26, Theme.TextTitle)
+		local icon = makeIcon(iconHolder, data.Image, 27, Theme.TextTitle)
 		if icon then
 			icon.AnchorPoint = Vector2.new(0.5, 0.5)
 			icon.Position = UDim2.fromScale(0.5, 0.5)
@@ -358,8 +509,8 @@ function RayfieldLibrary:Notify(data)
 	local textCol = create("Frame", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.Y,
-		Position = UDim2.fromOffset(hasIcon and 48 or 0, 0),
-		Size = UDim2.new(1, hasIcon and -48 or 0, 0, 0),
+		Position = UDim2.fromOffset(hasIcon and 52 or 2, 0),
+		Size = UDim2.new(1, hasIcon and -52 or -2, 0, 0),
 		Parent = card,
 	})
 	create("UIListLayout", {
@@ -373,7 +524,7 @@ function RayfieldLibrary:Notify(data)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Size = UDim2.new(1, 0, 0, 0),
 		Font = FONT_BOLD,
-		TextSize = 16,
+		TextSize = 17,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = data.Title or "Notification",
@@ -386,7 +537,7 @@ function RayfieldLibrary:Notify(data)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Size = UDim2.new(1, 0, 0, 0),
 		Font = FONT_MEDIUM,
-		TextSize = 14,
+		TextSize = 15,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = data.Content or "",
@@ -413,10 +564,11 @@ function RayfieldLibrary:Notify(data)
 	local function dismiss()
 		if dismissed then return end
 		dismissed = true
-		tween(card, TI_MED, {Position = UDim2.fromOffset(-360, 0)})
-		task.wait(0.18)
+		wrapper.ClipsDescendants = true
+		tween(card, TI_SMOOTH, {Position = UDim2.fromOffset(-370, 0)})
+		task.wait(0.2)
 		tween(wrapper, TI_MED, {Size = UDim2.new(1, 0, 0, 0)})
-		task.wait(0.24)
+		task.wait(0.28)
 		wrapper:Destroy()
 	end
 
@@ -428,8 +580,14 @@ function RayfieldLibrary:Notify(data)
 		task.wait()
 		local height = card.AbsoluteSize.Y
 		wrapper.Size = UDim2.new(1, 0, 0, height)
-		card.Position = UDim2.fromOffset(-360, 0)
+		card.Position = UDim2.fromOffset(-370, 0)
 		tween(card, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
+		-- unclip once in place so the soft shadow can bleed past the card
+		task.delay(0.3, function()
+			if not dismissed and wrapper.Parent then
+				wrapper.ClipsDescendants = false
+			end
+		end)
 
 		local duration = data.Duration or 5
 		local elapsed = 0
@@ -441,7 +599,7 @@ function RayfieldLibrary:Notify(data)
 	end)
 end
 
--- sign in toast ----------------------------------------------------------
+-- sign in toast
 
 local function showAccountToast()
 	if not LocalPlayer then return end
@@ -451,19 +609,24 @@ local function showAccountToast()
 	local wrapper = create("Frame", {
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
-		Size = UDim2.new(0, 220, 0, 56),
+		Size = UDim2.new(0, 240, 0, 58),
 		LayoutOrder = notifyOrder,
 		Parent = notifyStack,
 	})
 	local pill = create("Frame", {
 		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.new(0, 0, 0, 52),
-		Position = UDim2.fromOffset(-260, 0),
+		Size = UDim2.new(0, 0, 0, 54),
+		Position = UDim2.fromOffset(-280, 0),
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
 	roundFull(pill)
-	create("UIStroke", {Color = Theme.Stroke, Transparency = 0.65, Parent = pill})
-	padAll(pill, 6, 18, 6, 6)
+	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.92, Parent = pill})
+	create("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(170, 170, 170)),
+		Parent = pill,
+	})
+	padAll(pill, 6, 20, 6, 6)
 	create("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -474,7 +637,7 @@ local function showAccountToast()
 
 	local avatar = create("ImageLabel", {
 		BackgroundColor3 = Theme.Card,
-		Size = UDim2.fromOffset(40, 40),
+		Size = UDim2.fromOffset(42, 42),
 		Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=48&h=48",
 		LayoutOrder = 1,
 		Parent = pill,
@@ -492,7 +655,7 @@ local function showAccountToast()
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.new(0, 0, 0, 14),
-		Position = UDim2.fromOffset(0, 8),
+		Position = UDim2.fromOffset(0, 9),
 		Font = FONT_MEDIUM,
 		TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -504,7 +667,7 @@ local function showAccountToast()
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.new(0, 0, 0, 16),
-		Position = UDim2.fromOffset(0, 24),
+		Position = UDim2.fromOffset(0, 25),
 		Font = FONT_BOLD,
 		TextSize = 14,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -516,35 +679,259 @@ local function showAccountToast()
 	pill.Parent = wrapper
 	tween(pill, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
 	task.delay(4, function()
-		tween(pill, TI_MED, {Position = UDim2.fromOffset(-260, 0)})
+		tween(pill, TI_SMOOTH, {Position = UDim2.fromOffset(-280, 0)})
 		task.wait(0.25)
-		tween(wrapper, TI_MED, {Size = UDim2.new(0, 220, 0, 0)})
-		task.wait(0.24)
+		tween(wrapper, TI_MED, {Size = UDim2.new(0, 240, 0, 0)})
+		task.wait(0.26)
 		wrapper:Destroy()
 	end)
 end
 
--- window -----------------------------------------------------------------
+-- key system
+
+local function runKeySystem(Settings)
+	local keySettings = Settings.KeySettings or {}
+	local fileName = keySettings.FileName or "Key"
+	local keyPath = BASE_FOLDER .. "/" .. fileName .. ".txt"
+
+	local keys = {}
+	local rawKey = keySettings.Key or {}
+	if type(rawKey) == "string" then rawKey = {rawKey} end
+
+	if keySettings.GrabKeyFromSite then
+		for _, url in ipairs(rawKey) do
+			local body = httpGet(tostring(url))
+			if body then
+				body = string.gsub(body, "%s+$", "")
+				body = string.gsub(body, "^%s+", "")
+				table.insert(keys, body)
+			end
+		end
+	else
+		for _, k in ipairs(rawKey) do
+			table.insert(keys, tostring(k))
+		end
+	end
+
+	local function isValid(candidate)
+		candidate = string.gsub(tostring(candidate), "^%s+", "")
+		candidate = string.gsub(candidate, "%s+$", "")
+		for _, k in ipairs(keys) do
+			if candidate == k then return true end
+		end
+		return false
+	end
+
+	if #keys == 0 then
+		warn("Rayfield Gen2 | Key system enabled but no keys resolved, skipping")
+		return true
+	end
+
+	if keySettings.SaveKey then
+		local saved = safeReadFile(keyPath)
+		if saved and isValid(saved) then
+			return true
+		end
+	end
+
+	ensureRoot()
+
+	local overlay = create("Frame", {
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 50,
+		Parent = rootGui,
+	})
+	tween(overlay, TI_MED, {BackgroundTransparency = 0.45})
+
+	local card = create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = UDim2.fromOffset(360, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = Theme.Background,
+		ZIndex = 51,
+		Parent = overlay,
+	})
+	round(card, 20)
+	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.92, Parent = card})
+	create("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(160, 160, 160)),
+		Parent = card,
+	})
+	padAll(card, 24, 22, 22, 22)
+	create("UIListLayout", {
+		FillDirection = Enum.FillDirection.Vertical,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 10),
+		Parent = card,
+	})
+
+	local well = create("Frame", {
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.fromOffset(52, 52),
+		LayoutOrder = 1,
+		Parent = card,
+	})
+	roundFull(well)
+	local keyIcon = makeIcon(well, "key-round", 26, Theme.TextTitle)
+	if keyIcon then
+		keyIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+		keyIcon.Position = UDim2.fromScale(0.5, 0.5)
+	end
+
+	create("TextLabel", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+		Font = FONT_BOLD,
+		TextSize = 20,
+		TextWrapped = true,
+		Text = keySettings.Title or Settings.Name or "Key System",
+		TextColor3 = Theme.TextTitle,
+		LayoutOrder = 2,
+		Parent = card,
+	})
+	create("TextLabel", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+		Font = FONT_MEDIUM,
+		TextSize = 14,
+		TextWrapped = true,
+		Text = keySettings.Subtitle or "Enter your key to continue",
+		TextColor3 = Theme.TextSub,
+		LayoutOrder = 3,
+		Parent = card,
+	})
+	if keySettings.Note and keySettings.Note ~= "" then
+		create("TextLabel", {
+			BackgroundTransparency = 1,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, 0, 0, 0),
+			Font = FONT_REGULAR,
+			TextSize = 13,
+			TextWrapped = true,
+			Text = keySettings.Note,
+			TextColor3 = Theme.TextMuted,
+			LayoutOrder = 4,
+			Parent = card,
+		})
+	end
+
+	local boxHolder = create("Frame", {
+		BackgroundColor3 = Theme.CardInset,
+		Size = UDim2.new(1, 0, 0, 44),
+		LayoutOrder = 5,
+		Parent = card,
+	})
+	round(boxHolder, 12)
+	local boxStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.88, Parent = boxHolder})
+	local box = create("TextBox", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(14, 0),
+		Size = UDim2.new(1, -28, 1, 0),
+		Font = FONT_MEDIUM,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		PlaceholderText = "Key",
+		PlaceholderColor3 = Theme.TextMuted,
+		Text = "",
+		ClearTextOnFocus = false,
+		TextColor3 = Theme.TextBody,
+		Parent = boxHolder,
+	})
+
+	local submit = create("TextButton", {
+		BackgroundColor3 = Theme.TextTitle,
+		Size = UDim2.new(1, 0, 0, 44),
+		Font = FONT_BOLD,
+		TextSize = 15,
+		Text = "Unlock",
+		TextColor3 = Color3.fromRGB(12, 12, 12),
+		AutoButtonColor = false,
+		LayoutOrder = 6,
+		Parent = card,
+	})
+	round(submit, 12)
+	submit.MouseEnter:Connect(function()
+		tween(submit, TI_FAST, {BackgroundColor3 = Color3.fromRGB(220, 220, 220)})
+	end)
+	submit.MouseLeave:Connect(function()
+		tween(submit, TI_FAST, {BackgroundColor3 = Theme.TextTitle})
+	end)
+
+	card.Position = UDim2.fromScale(0.5, 0.56)
+	tween(card, TI_MORPH, {Position = UDim2.fromScale(0.5, 0.5)})
+
+	local passed = false
+
+	local function shake()
+		tween(boxStroke, TweenInfo.new(0.1), {Color = Color3.fromRGB(224, 90, 90), Transparency = 0.2})
+		local base = card.Position
+		local seq = {8, -7, 5, -3, 0}
+		task.spawn(function()
+			for _, dx in ipairs(seq) do
+				tween(card, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Position = UDim2.new(base.X.Scale, dx, base.Y.Scale, 0),
+				})
+				task.wait(0.05)
+			end
+			task.wait(0.4)
+			tween(boxStroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.88})
+		end)
+	end
+
+	local function attempt()
+		if isValid(box.Text) then
+			passed = true
+			if keySettings.SaveKey then
+				safeWriteFile(keyPath, box.Text)
+			end
+			tween(card, TI_MED, {Position = UDim2.fromScale(0.5, 0.54)})
+			tween(overlay, TI_MED, {BackgroundTransparency = 1})
+			task.wait(0.22)
+			overlay:Destroy()
+		else
+			shake()
+		end
+	end
+
+	submit.MouseButton1Click:Connect(function() task.spawn(attempt) end)
+	box.FocusLost:Connect(function(enterPressed)
+		if enterPressed then task.spawn(attempt) end
+	end)
+
+	repeat task.wait() until passed or destroyed or not overlay.Parent
+	return passed
+end
+
+-- window
 
 function RayfieldLibrary:CreateWindow(Settings)
 	Settings = Settings or {}
 	ensureRoot()
 
 	if Settings.KeySystem then
-		warn("Rayfield Gen2: KeySystem is not supported yet, continuing without it")
+		local ok = runKeySystem(Settings)
+		if not ok then
+			warn("Rayfield Gen2 | Key system was not passed")
+			return nil
+		end
 	end
 
 	-- configuration saving setup
 	local configEnabled = false
-	local configFolder = "Rayfield Gen2"
+	local configFolder = BASE_FOLDER
 	local configFile = "Config"
 	if type(Settings.ConfigurationSaving) == "table" and Settings.ConfigurationSaving.Enabled then
 		configEnabled = fsAvailable
 		configFolder = Settings.ConfigurationSaving.FolderName or configFolder
 		configFile = Settings.ConfigurationSaving.FileName or configFile
 	end
-	local baseFolder = "Rayfield Gen2"
-	ensureFolder(baseFolder)
 	if configEnabled then ensureFolder(configFolder) end
 
 	local savePending = false
@@ -557,11 +944,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			if destroyed then return end
 			local out = {}
 			for flag, element in pairs(RayfieldLibrary.Flags) do
-				if element.Type == "Toggle" then
-					out[flag] = element.CurrentValue
-				elseif element.Type == "Slider" then
-					out[flag] = element.CurrentValue
-				elseif element.Type == "Input" then
+				if element.Type == "Toggle" or element.Type == "Slider" or element.Type == "Input" then
 					out[flag] = element.CurrentValue
 				elseif element.Type == "Dropdown" then
 					out[flag] = element.CurrentOption
@@ -579,19 +962,27 @@ function RayfieldLibrary:CreateWindow(Settings)
 	-- sign in toast when the account changed since last run
 	task.spawn(function()
 		if not fsAvailable or not LocalPlayer then return end
-		local path = baseFolder .. "/lastuser.txt"
+		local path = BASE_FOLDER .. "/lastuser.txt"
 		local last = safeReadFile(path)
 		local current = tostring(LocalPlayer.UserId)
 		safeWriteFile(path, current)
 		if last ~= nil and last ~= current then
-			task.wait(0.4)
+			task.wait(0.5)
 			showAccountToast()
 		end
 	end)
 
-	local WINDOW_W, WINDOW_H = 460, 545
-	local HEADER_H = 74
-	local PILL_W, PILL_H = 210, 52
+	local WINDOW_W, WINDOW_H = 470, 550
+	local HEADER_H = 76
+	local PILL_H = 62
+
+	-- pill width from the window name so long names fit
+	local pillNameText = Settings.Name or "Rayfield"
+	local pillTextW = math.max(
+		measureText(pillNameText, 16, FONT_BOLD).X,
+		measureText("Tap to show", 13, FONT_MEDIUM).X
+	)
+	local PILL_W = math.clamp(12 + 44 + 12 + math.ceil(pillTextW) + 26, 180, 340)
 
 	local shownPosition = UDim2.new(0.5, 0, 0.5, -math.floor((WINDOW_H + 18) / 2))
 
@@ -604,19 +995,40 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = rootGui,
 	})
 
+	-- soft drop shadow that follows the window through every morph
+	local shadow = create("ImageLabel", {
+		Name = "Shadow",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, -26),
+		Size = UDim2.fromOffset(WINDOW_W + 52, WINDOW_H + 52),
+		Image = GLOW_IMAGE,
+		ImageColor3 = Color3.fromRGB(0, 0, 0),
+		ImageTransparency = 0.42,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(49, 49, 450, 450),
+		ZIndex = 0,
+		Parent = root,
+	})
+
 	local window = create("Frame", {
 		Name = "Window",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 0),
 		Size = UDim2.fromOffset(WINDOW_W, WINDOW_H),
 		ClipsDescendants = true,
+		ZIndex = 1,
 		Parent = root,
 	})
 	paint(window, "BackgroundColor3", "Background")
-	local windowCorner = round(window, 18)
+	local windowCorner = round(window, 20)
+	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Parent = window})
 	create("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(178, 178, 178)),
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(148, 148, 148)),
+		}),
 		Parent = window,
 	})
 
@@ -634,13 +1046,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Position = UDim2.new(0.5, 0, 0, WINDOW_H + 12),
 		Size = UDim2.fromOffset(130, 4),
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		BackgroundTransparency = 0.35,
+		BackgroundTransparency = 1,
 		Parent = root,
 	})
 	roundFull(handle)
 
 	connect(window:GetPropertyChangedSignal("Size"), function()
-		handle.Position = UDim2.new(0.5, 0, 0, window.Size.Y.Offset + 12)
+		local size = window.Size
+		handle.Position = UDim2.new(0.5, 0, 0, size.Y.Offset + 12)
+		shadow.Size = UDim2.fromOffset(size.X.Offset + 52, size.Y.Offset + 52)
 	end)
 
 	-- pill contents for the hidden state
@@ -654,55 +1068,68 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = window,
 	})
 	do
-		local row = create("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 1, 0),
+		local well = create("Frame", {
+			BackgroundColor3 = Theme.Card,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 9, 0.5, 0),
+			Size = UDim2.fromOffset(44, 44),
 			Parent = pillContent,
 		})
-		create("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 10),
-			Parent = row,
+		roundFull(well)
+		create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 190, 190)),
+			Parent = well,
 		})
-		if Settings.Icon and Settings.Icon ~= 0 then
-			local ic = makeIcon(row, Settings.Icon, 24, Theme.TextTitle)
-			if ic then ic.LayoutOrder = 1 end
+		local placedIcon = nil
+		if Settings.Icon and Settings.Icon ~= 0 and Settings.Icon ~= "" then
+			placedIcon = makeIcon(well, Settings.Icon, 24, Theme.TextTitle)
 		end
+		if placedIcon then
+			placedIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+			placedIcon.Position = UDim2.fromScale(0.5, 0.5)
+		else
+			create("TextLabel", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(30, 30),
+				Font = FONT_BOLD,
+				TextSize = 20,
+				Text = string.upper(string.sub(pillNameText, 1, 1)),
+				TextColor3 = Theme.TextTitle,
+				Parent = well,
+			})
+		end
+
 		local col = create("Frame", {
 			BackgroundTransparency = 1,
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 0, 34),
-			LayoutOrder = 2,
-			Parent = row,
+			Position = UDim2.new(0, 65, 0.5, -17),
+			Size = UDim2.new(1, -91, 0, 34),
+			Parent = pillContent,
 		})
-		local pillName = create("TextLabel", {
+		create("TextLabel", {
 			BackgroundTransparency = 1,
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 0, 16),
+			Size = UDim2.new(1, 0, 0, 17),
 			Font = FONT_BOLD,
-			TextSize = 15,
+			TextSize = 16,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = Settings.Name or "Rayfield",
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Text = pillNameText,
+			TextColor3 = Theme.TextTitle,
 			Parent = col,
 		})
-		paint(pillName, "TextColor3", "TextTitle")
-		local pillSub = create("TextLabel", {
+		create("TextLabel", {
 			BackgroundTransparency = 1,
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 0, 13),
-			Position = UDim2.fromOffset(0, 18),
+			Position = UDim2.fromOffset(0, 19),
+			Size = UDim2.new(1, 0, 0, 14),
 			Font = FONT_MEDIUM,
-			TextSize = 11,
+			TextSize = 13,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Text = "Tap to show",
+			TextColor3 = Theme.TextSub,
 			Parent = col,
 		})
-		paint(pillSub, "TextColor3", "TextSub")
 	end
 
 	local pillButton = create("TextButton", {
@@ -714,7 +1141,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = window,
 	})
 
-	-- header ---------------------------------------------------------
+	-- header
 
 	local header = create("Frame", {
 		Name = "Header",
@@ -726,15 +1153,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local titleRow = create("Frame", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
-		Position = UDim2.fromOffset(22, 14),
-		Size = UDim2.new(0, 0, 0, 28),
+		Position = UDim2.fromOffset(24, 13),
+		Size = UDim2.new(0, 0, 0, 27),
 		Parent = header,
 	})
 	create("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 12),
+		Padding = UDim.new(0, 11),
 		Parent = titleRow,
 	})
 
@@ -743,7 +1170,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.new(0, 0, 1, 0),
 		Font = FONT_BOLD,
-		TextSize = 22,
+		TextSize = 21,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = Settings.Name or "Rayfield",
 		LayoutOrder = 1,
@@ -756,13 +1183,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 		local badgeIcon = type(Settings.Badge) == "table" and Settings.Badge.Icon or nil
 		local badge = create("Frame", {
 			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 0, 28),
+			Size = UDim2.new(0, 0, 0, 26),
 			LayoutOrder = 2,
 			Parent = titleRow,
 		})
 		paint(badge, "BackgroundColor3", "BadgeBackground")
 		roundFull(badge)
-		padAll(badge, 0, 12, 0, 12)
+		padAll(badge, 0, 12, 0, 11)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -779,7 +1206,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.new(0, 0, 1, 0),
 			Font = FONT_BOLD,
-			TextSize = 14,
+			TextSize = 13,
 			Text = badgeText,
 			LayoutOrder = 2,
 			Parent = badge,
@@ -790,7 +1217,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local subtitleLabel = create("TextLabel", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
-		Position = UDim2.fromOffset(22, 44),
+		Position = UDim2.fromOffset(24, 42),
 		Size = UDim2.new(0, 0, 0, 15),
 		Font = FONT_MEDIUM,
 		TextSize = 13,
@@ -804,7 +1231,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local buttonRow = create("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -18, 0, 20),
+		Position = UDim2.new(1, -16, 0, 15),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.new(0, 0, 0, 30),
 		Parent = header,
@@ -814,11 +1241,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 4),
+		Padding = UDim.new(0, 6),
 		Parent = buttonRow,
 	})
 
-	local function headerButton(order, lucideNames, fallbackText)
+	local function headerButton(order, lucideNames)
 		local btn = create("TextButton", {
 			BackgroundTransparency = 1,
 			Text = "",
@@ -830,71 +1257,36 @@ function RayfieldLibrary:CreateWindow(Settings)
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(18, 18),
+			Size = UDim2.fromOffset(19, 19),
 			ImageColor3 = Theme.TextSub,
 			Parent = btn,
 		})
-		local fallback = nil
-		local function applyIcon(names)
-			local asset = firstLucide(names)
-			if asset then
-				icon.Image = "rbxassetid://" .. tostring(asset.id)
-				icon.ImageRectSize = asset.size
-				icon.ImageRectOffset = asset.offset
-				icon.Visible = true
-				if fallback then fallback.Visible = false end
-				return true
-			end
-			return false
-		end
-		if not applyIcon(lucideNames) then
-			fallback = create("TextLabel", {
-				BackgroundTransparency = 1,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(20, 20),
-				Font = FONT_BOLD,
-				TextSize = 16,
-				Text = fallbackText or "",
-				TextColor3 = Theme.TextSub,
-				Parent = btn,
-			})
-			icon.Visible = false
-			task.spawn(function()
-				for _ = 1, 40 do
-					task.wait(0.25)
-					if not btn.Parent then return end
-					if applyIcon(lucideNames) then return end
-				end
-			end)
-		end
+		applyLucide(icon, lucideNames)
 		btn.MouseEnter:Connect(function()
 			tween(icon, TI_FAST, {ImageColor3 = Theme.TextTitle})
-			if fallback then tween(fallback, TI_FAST, {TextColor3 = Theme.TextTitle}) end
 		end)
 		btn.MouseLeave:Connect(function()
 			tween(icon, TI_FAST, {ImageColor3 = Theme.TextSub})
-			if fallback then tween(fallback, TI_FAST, {TextColor3 = Theme.TextSub}) end
 		end)
 		return btn, icon
 	end
 
-	local searchButton = headerButton(1, {"text-search", "search"}, "")
-	local settingsButton = headerButton(2, {"settings"}, "")
-	local minimizeButton, minimizeIcon = headerButton(3, {"minus"}, "-")
-	local closeButton = headerButton(4, {"x"}, "x")
+	local searchButton, searchButtonIcon = headerButton(1, {"text-search", "search"})
+	local settingsButton, settingsButtonIcon = headerButton(2, {"settings"})
+	local minimizeButton, minimizeIcon = headerButton(3, {"minus"})
+	local closeButton = headerButton(4, {"x"})
 
-	-- body -----------------------------------------------------------
+	-- body
 
 	local body = create("Frame", {
 		Name = "Body",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(18, HEADER_H),
-		Size = UDim2.new(1, -36, 1, -HEADER_H - 12),
+		Position = UDim2.fromOffset(20, HEADER_H),
+		Size = UDim2.new(1, -40, 1, -HEADER_H - 14),
 		Parent = main,
 	})
 
-	local TABBAR_H = 42
+	local TABBAR_H = 40
 	local tabBar = create("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, TABBAR_H),
@@ -913,11 +1305,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = tabBar,
 	})
 
-	-- search row sits between the tab bar and the pages
+	-- search row between the tab bar and the pages
 	local searchHolder = create("Frame", {
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
-		Position = UDim2.fromOffset(0, TABBAR_H + 6),
+		Position = UDim2.fromOffset(0, TABBAR_H + 8),
 		Size = UDim2.new(1, 0, 0, 0),
 		Parent = body,
 	})
@@ -957,18 +1349,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	local pagesHolder = create("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, TABBAR_H + 8),
-		Size = UDim2.new(1, 0, 1, -(TABBAR_H + 8)),
+		Position = UDim2.fromOffset(0, TABBAR_H + 10),
+		Size = UDim2.new(1, 0, 1, -(TABBAR_H + 10)),
 		Parent = body,
 	})
 
-	-- window state ----------------------------------------------------
+	-- window state
 
 	local Window = {}
 	local tabs = {}
 	local currentTab = nil
 	local settingsOpen = false
-	local settingsPage = nil
+	local settingsEntry = nil
 	local hidden = false
 	local minimized = false
 	local searchOpen = false
@@ -977,22 +1369,28 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	local function layoutSearch(open)
 		searchOpen = open
-		local sh = open and 46 or 0
+		local sh = open and 48 or 0
 		tween(searchHolder, TI_MED, {Size = UDim2.new(1, 0, 0, open and 40 or 0)})
 		tween(pagesHolder, TI_MED, {
-			Position = UDim2.fromOffset(0, TABBAR_H + 8 + sh),
-			Size = UDim2.new(1, 0, 1, -(TABBAR_H + 8 + sh)),
+			Position = UDim2.fromOffset(0, TABBAR_H + 10 + sh),
+			Size = UDim2.new(1, 0, 1, -(TABBAR_H + 10 + sh)),
 		})
+		tween(searchButtonIcon, TI_FAST, {ImageColor3 = open and Theme.TextTitle or Theme.TextSub})
 		if open then
-			task.delay(0.1, function() searchBox:CaptureFocus() end)
+			task.delay(0.12, function() searchBox:CaptureFocus() end)
 		else
 			searchBox.Text = ""
 			searchBox:ReleaseFocus()
 		end
 	end
 
+	local function currentPage()
+		if settingsOpen and settingsEntry then return settingsEntry.Page end
+		return currentTab and currentTab.Page or nil
+	end
+
 	local function applySearchFilter(query)
-		local page = settingsOpen and settingsPage or (currentTab and currentTab.Page)
+		local page = currentPage()
 		if not page then return end
 		query = string.lower(query or "")
 		for _, item in ipairs(page:GetChildren()) do
@@ -1019,32 +1417,16 @@ function RayfieldLibrary:CreateWindow(Settings)
 		if not searchOpen then applySearchFilter("") end
 	end)
 
-	-- tab switching
-	local function selectTab(tab)
-		if settingsOpen then
-			settingsOpen = false
-			if settingsPage then settingsPage.Visible = false end
-		end
-		currentTab = tab
-		for _, other in ipairs(tabs) do
-			local active = other == tab
-			other.Page.Visible = active
-			tween(other.Pill, TI_FAST, {BackgroundColor3 = active and Theme.CardHover or Theme.CardInset})
-			tween(other.PillLabel, TI_FAST, {TextColor3 = active and Theme.TextTitle or Theme.TextSub})
-			if other.PillIcon then
-				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
-			end
-			other.PillStroke.Transparency = active and 0.55 or 0.75
-		end
-		if searchOpen then
-			searchBox.Text = ""
-			applySearchFilter("")
-		end
-	end
-
-	-- pages -----------------------------------------------------------
+	-- pages, each wrapped in a CanvasGroup so tab switches can fade
 
 	local function buildPage()
+		local pageWrapper = create("CanvasGroup", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			GroupTransparency = 0,
+			Visible = false,
+			Parent = pagesHolder,
+		})
 		local page = create("ScrollingFrame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
@@ -1052,10 +1434,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			ScrollBarThickness = 3,
-			ScrollBarImageColor3 = Color3.fromRGB(70, 70, 70),
+			ScrollBarImageColor3 = Color3.fromRGB(90, 90, 90),
+			ScrollBarImageTransparency = 0.4,
 			BorderSizePixel = 0,
-			Visible = false,
-			Parent = pagesHolder,
+			Parent = pageWrapper,
 		})
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
@@ -1063,11 +1445,51 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Padding = UDim.new(0, 8),
 			Parent = page,
 		})
-		padAll(page, 2, 4, 14, 0)
-		return page
+		padAll(page, 2, 5, 16, 1)
+		return page, pageWrapper
 	end
 
-	-- element construction ---------------------------------------------
+	local function showPage(entry)
+		for _, other in ipairs(tabs) do
+			if other ~= entry then other.Wrapper.Visible = false end
+		end
+		if settingsEntry and settingsEntry ~= entry then
+			settingsEntry.Wrapper.Visible = false
+		end
+		local wrapper = entry.Wrapper
+		wrapper.Visible = true
+		wrapper.GroupTransparency = 1
+		wrapper.Position = UDim2.fromOffset(0, 12)
+		tween(wrapper, TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
+		tween(wrapper, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(0, 0)})
+	end
+
+	local function styleTabPills()
+		for _, other in ipairs(tabs) do
+			local active = (not settingsOpen) and other == currentTab
+			tween(other.Pill, TI_FAST, {BackgroundColor3 = active and Theme.CardHover or Theme.CardInset, BackgroundTransparency = active and 0 or 0.25})
+			tween(other.PillLabel, TI_FAST, {TextColor3 = active and Theme.TextTitle or Theme.TextSub})
+			if other.PillIcon then
+				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
+			end
+			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.82 or 0.9})
+		end
+		tween(settingsButtonIcon, TI_FAST, {ImageColor3 = settingsOpen and Theme.TextTitle or Theme.TextSub, Rotation = settingsOpen and 90 or 0})
+	end
+
+	local function selectTab(tab)
+		if currentTab == tab and not settingsOpen then return end
+		settingsOpen = false
+		currentTab = tab
+		styleTabPills()
+		showPage(tab)
+		if searchOpen then
+			searchBox.Text = ""
+			applySearchFilter("")
+		end
+	end
+
+	-- element construction
 
 	local elementOrder = 0
 	local function nextOrder()
@@ -1084,24 +1506,32 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end
 
+	local function cardBase(card)
+		round(card, 14)
+		create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(226, 226, 226)),
+			Parent = card,
+		})
+	end
+
 	local function makeCard(page, name, icon, height)
 		local card = create("Frame", {
-			Size = UDim2.new(1, 0, 0, height or 48),
+			Size = UDim2.new(1, 0, 0, height or 50),
 			LayoutOrder = nextOrder(),
 			Parent = page,
 		})
 		card:SetAttribute("SearchName", name or "")
 		paint(card, "BackgroundColor3", "Card")
-		round(card, 14)
-		strokeOn(card, "Stroke", 0.75)
+		cardBase(card)
 
-		local textX = 16
+		local textX = 17
 		if icon then
-			local ic = makeIcon(card, icon, 18, Theme.TextTitle, 0.05)
+			local ic = makeIcon(card, icon, 18, Theme.TextTitle, 0.04)
 			if ic then
 				ic.AnchorPoint = Vector2.new(0, 0.5)
-				ic.Position = UDim2.new(0, 15, 0.5, 0)
-				textX = 42
+				ic.Position = UDim2.new(0, 16, 0.5, 0)
+				textX = 44
 			end
 		end
 		local label = create("TextLabel", {
@@ -1125,7 +1555,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		local desc = create("TextLabel", {
 			BackgroundTransparency = 1,
 			AutomaticSize = Enum.AutomaticSize.Y,
-			Size = UDim2.new(1, -28, 0, 0),
+			Size = UDim2.new(1, -30, 0, 0),
 			Font = FONT_REGULAR,
 			TextSize = 13,
 			TextWrapped = true,
@@ -1135,7 +1565,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Parent = page,
 		})
 		desc:SetAttribute("SearchName", (card:GetAttribute("SearchName") or "") .. " " .. text)
-		padAll(desc, 0, 0, 4, 14)
+		padAll(desc, 0, 0, 5, 16)
 		paint(desc, "TextColor3", "TextMuted")
 		return desc
 	end
@@ -1149,7 +1579,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end)
 	end
 
-	-- Tab -------------------------------------------------------------
+	-- Tab API
 
 	local function buildTabAPI(page)
 		local Tab = {}
@@ -1166,8 +1596,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local label = create("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.new(0, 8, 1, -2),
-				Size = UDim2.new(1, -16, 0, 16),
+				Position = UDim2.new(0, 10, 1, -3),
+				Size = UDim2.new(1, -20, 0, 16),
 				Font = FONT_MEDIUM,
 				TextSize = 14,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1185,19 +1615,20 @@ function RayfieldLibrary:CreateWindow(Settings)
 		function Tab:CreateDivider()
 			local holder = create("Frame", {
 				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, 6),
+				Size = UDim2.new(1, 0, 0, 8),
 				LayoutOrder = nextOrder(),
 				Parent = page,
 			})
 			holder:SetAttribute("Structural", true)
-			local line = create("Frame", {
+			create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.new(1, -8, 0, 1),
+				Size = UDim2.new(1, -12, 0, 1),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.9,
 				BorderSizePixel = 0,
 				Parent = holder,
 			})
-			paint(line, "BackgroundColor3", "Stroke")
 			local DividerValue = {}
 			function DividerValue:Set(visible)
 				holder.Visible = visible
@@ -1205,16 +1636,16 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return DividerValue
 		end
 
-		function Tab:CreateLabel(text, icon, color, ignoreTheme)
-			local card, label = makeCard(page, text, icon, 44)
-			card.BackgroundTransparency = 0.45
+		function Tab:CreateLabel(text, icon, color, _ignoreTheme)
+			local card, label = makeCard(page, text, icon, 46)
+			card.BackgroundTransparency = 0.5
 			if color and typeof(color) == "Color3" then
 				label.TextColor3 = color
 			else
 				label.TextColor3 = Theme.TextSub
 			end
 			local LabelValue = {}
-			function LabelValue:Set(newText, newIcon, newColor)
+			function LabelValue:Set(newText, _newIcon, newColor)
 				label.Text = newText or label.Text
 				if newColor and typeof(newColor) == "Color3" then
 					label.TextColor3 = newColor
@@ -1234,9 +1665,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			card:SetAttribute("SearchName", (ParagraphSettings.Title or "") .. " " .. (ParagraphSettings.Content or ""))
 			paint(card, "BackgroundColor3", "Card")
-			round(card, 14)
-			strokeOn(card, "Stroke", 0.75)
-			padAll(card, 14, 16, 14, 16)
+			cardBase(card)
+			padAll(card, 14, 17, 14, 17)
 			create("UIListLayout", {
 				FillDirection = Enum.FillDirection.Vertical,
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -1288,44 +1718,44 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = page,
 			})
 			card:SetAttribute("SearchName", StatSettings.Name or "")
-			card.BackgroundColor3 = Theme.Accent
+			card.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 			round(card, 14)
 			create("UIGradient", {
-				Rotation = 115,
+				Rotation = 112,
 				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-					ColorSequenceKeypoint.new(0.55, Color3.fromRGB(120, 120, 120)),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 70, 70)),
+					ColorSequenceKeypoint.new(0, Theme.AccentSoft),
+					ColorSequenceKeypoint.new(0.45, Theme.Accent),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 42, 33)),
 				}),
 				Parent = card,
 			})
 
-			local topX = 16
+			local topX = 17
 			if StatSettings.Icon then
-				local ic = makeIcon(card, StatSettings.Icon, 20, Color3.fromRGB(235, 250, 242))
+				local ic = makeIcon(card, StatSettings.Icon, 21, Color3.fromRGB(238, 252, 245))
 				if ic then
-					ic.Position = UDim2.fromOffset(15, 14)
-					topX = 44
+					ic.Position = UDim2.fromOffset(16, 14)
+					topX = 46
 				end
 			end
 			local nameLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(topX, 14),
+				Position = UDim2.fromOffset(topX, 15),
 				Size = UDim2.new(1, -topX - 16, 0, 20),
 				Font = FONT_BOLD,
 				TextSize = 17,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				TextColor3 = Color3.fromRGB(240, 252, 246),
+				TextColor3 = Color3.fromRGB(242, 252, 247),
 				Text = StatSettings.Name or "",
 				Parent = card,
 			})
 			local valueLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.new(0, 16, 1, -12),
+				Position = UDim2.new(0, 17, 1, -12),
 				Size = UDim2.new(0.6, 0, 0, 28),
 				Font = FONT_BOLD,
-				TextSize = 24,
+				TextSize = 25,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				Text = tostring(StatSettings.Value or ""),
@@ -1334,12 +1764,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local deltaLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(1, 1),
-				Position = UDim2.new(1, -16, 1, -14),
+				Position = UDim2.new(1, -17, 1, -15),
 				Size = UDim2.new(0.35, 0, 0, 18),
 				Font = FONT_BOLD,
 				TextSize = 14,
 				TextXAlignment = Enum.TextXAlignment.Right,
-				TextColor3 = Color3.fromRGB(196, 240, 217),
+				TextColor3 = Color3.fromRGB(202, 242, 221),
 				Text = tostring(StatSettings.Delta or ""),
 				Parent = card,
 			})
@@ -1355,7 +1785,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		function Tab:CreateButton(ButtonSettings)
 			ButtonSettings = ButtonSettings or {}
-			local card, label = makeCard(page, ButtonSettings.Name, ButtonSettings.Icon, 48)
+			local card, label = makeCard(page, ButtonSettings.Name, ButtonSettings.Icon, 50)
 			makeDescription(page, card, ButtonSettings.Description)
 			hoverable(card)
 			local clicker = create("TextButton", {
@@ -1365,8 +1795,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = card,
 			})
 			clicker.MouseButton1Click:Connect(function()
-				tween(card, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {BackgroundColor3 = Theme.CardSelected})
-				task.delay(0.1, function()
+				tween(card, TweenInfo.new(0.07, Enum.EasingStyle.Quad), {BackgroundColor3 = Theme.CardSelected})
+				task.delay(0.09, function()
 					tween(card, TI_MED, {BackgroundColor3 = Theme.Card})
 				end)
 				runCallback(ButtonSettings.Callback)
@@ -1381,29 +1811,40 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		function Tab:CreateToggle(ToggleSettings)
 			ToggleSettings = ToggleSettings or {}
-			local card = makeCard(page, ToggleSettings.Name, ToggleSettings.Icon, 48)
+			local card = makeCard(page, ToggleSettings.Name, ToggleSettings.Icon, 50)
 			makeDescription(page, card, ToggleSettings.Description)
 			hoverable(card)
 
+			-- dark inset track with a large pill knob, per the Gen2 design
 			local track = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -14, 0.5, 0),
-				Size = UDim2.fromOffset(46, 26),
-				Parent = card,
+				Position = UDim2.new(1, -15, 0.5, 0),
+				Size = UDim2.fromOffset(52, 28),
 			})
+			paint(track, "BackgroundColor3", "ToggleTrack")
 			roundFull(track)
-			create("UIGradient", {
-				Rotation = 0,
-				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(210, 210, 210)),
+			local trackStroke = create("UIStroke", {
+				Color = Color3.fromRGB(255, 255, 255),
+				Transparency = 0.86,
 				Parent = track,
 			})
+			track.Parent = card
+
+			local knobGlow = nil
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 3, 0.5, 0),
-				Size = UDim2.fromOffset(20, 20),
-				Parent = track,
+				Position = UDim2.new(0, 4, 0.5, 0),
+				Size = UDim2.fromOffset(26, 20),
+				BackgroundColor3 = Theme.KnobOff,
 			})
 			roundFull(knob)
+			create("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
+				Parent = knob,
+			})
+			knobGlow = softGlow(knob, Theme.Accent, 1, 22)
+			knob.Parent = track
 
 			local Toggle = {
 				Type = "Toggle",
@@ -1412,11 +1853,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			local function render(animate)
 				local on = Toggle.CurrentValue
-				local info = animate and TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out) or TweenInfo.new(0)
-				tween(track, info, {BackgroundColor3 = on and Theme.Accent or Theme.ToggleOff})
+				local info = animate and TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) or TweenInfo.new(0)
 				tween(knob, info, {
-					Position = on and UDim2.new(1, -23, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
-					BackgroundColor3 = on and Color3.fromRGB(228, 246, 236) or Theme.KnobOff,
+					Position = on and UDim2.new(1, -30, 0.5, 0) or UDim2.new(0, 4, 0.5, 0),
+					BackgroundColor3 = on and Theme.Accent or Theme.KnobOff,
+				})
+				tween(knobGlow, info, {ImageTransparency = on and 0.62 or 1})
+				tween(trackStroke, info, {
+					Color = on and Theme.AccentDark or Color3.fromRGB(255, 255, 255),
+					Transparency = on and 0.55 or 0.86,
 				})
 			end
 			render(false)
@@ -1455,28 +1900,27 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local suffix = SliderSettings.Suffix or ""
 
 			local card = create("Frame", {
-				Size = UDim2.new(1, 0, 0, 58),
+				Size = UDim2.new(1, 0, 0, 60),
 				LayoutOrder = nextOrder(),
 				Parent = page,
 			})
 			card:SetAttribute("SearchName", SliderSettings.Name or "")
 			paint(card, "BackgroundColor3", "Card")
-			round(card, 14)
-			strokeOn(card, "Stroke", 0.75)
+			cardBase(card)
 			makeDescription(page, card, SliderSettings.Description)
 
-			local textX = 16
+			local textX = 17
 			if SliderSettings.Icon then
-				local ic = makeIcon(card, SliderSettings.Icon, 18, Theme.TextTitle, 0.05)
+				local ic = makeIcon(card, SliderSettings.Icon, 18, Theme.TextTitle, 0.04)
 				if ic then
-					ic.Position = UDim2.fromOffset(15, 12)
-					textX = 42
+					ic.Position = UDim2.fromOffset(16, 13)
+					textX = 44
 				end
 			end
 			local nameLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(textX, 10),
-				Size = UDim2.new(0.5, -textX, 0, 18),
+				Position = UDim2.fromOffset(textX, 11),
+				Size = UDim2.new(0.48, -textX, 0, 18),
 				Font = FONT_MEDIUM,
 				TextSize = 16,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1487,8 +1931,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			paint(nameLabel, "TextColor3", "TextBody")
 			local valueLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(textX, 31),
-				Size = UDim2.new(0.5, -textX, 0, 16),
+				Position = UDim2.fromOffset(textX, 32),
+				Size = UDim2.new(0.48, -textX, 0, 16),
 				Font = FONT_REGULAR,
 				TextSize = 13,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1497,11 +1941,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			paint(valueLabel, "TextColor3", "TextSub")
 
+			-- dark track, gradient green fill with a soft bloom, glowing
+			-- white pill knob with no ring
 			local track = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -16, 0.5, 0),
-				Size = UDim2.new(0.42, 0, 0, 18),
-				BackgroundColor3 = Color3.fromRGB(52, 52, 52),
+				Position = UDim2.new(1, -17, 0.5, 0),
+				Size = UDim2.new(0.46, 0, 0, 20),
+				BackgroundColor3 = Color3.fromRGB(45, 45, 45),
 				BackgroundTransparency = 0.25,
 			})
 			roundFull(track)
@@ -1509,31 +1955,28 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			local fill = create("Frame", {
 				Size = UDim2.new(0.5, 0, 1, 0),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 				Parent = track,
 			})
-			paint(fill, "BackgroundColor3", "Accent")
 			roundFull(fill)
 			create("UIGradient", {
-				Rotation = 0,
-				Color = ColorSequence.new(Color3.fromRGB(160, 160, 160), Color3.fromRGB(255, 255, 255)),
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Theme.AccentDark),
+					ColorSequenceKeypoint.new(1, Theme.AccentSoft),
+				}),
 				Parent = fill,
 			})
+			softGlow(fill, Theme.Accent, 0.76, 20)
 
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(0.5, 0, 0.5, 0),
-				Size = UDim2.fromOffset(34, 26),
+				Size = UDim2.fromOffset(36, 27),
 				ZIndex = 3,
 			})
 			paint(knob, "BackgroundColor3", "Knob")
 			roundFull(knob)
-			create("UIStroke", {
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				Color = Color3.fromRGB(255, 255, 255),
-				Transparency = 0.75,
-				Thickness = 4,
-				Parent = knob,
-			})
+			softGlow(knob, Color3.fromRGB(255, 255, 255), 0.62, 26, 2)
 			knob.Parent = track
 
 			local Slider = {
@@ -1555,6 +1998,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				return text
 			end
 
+			-- knob rides the end of the fill, overhanging it slightly
 			local function render(animate)
 				local alpha = 0
 				if range[2] ~= range[1] then
@@ -1563,7 +2007,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				alpha = math.clamp(alpha, 0, 1)
 				local minAlpha = 0.2
 				local shown = minAlpha + alpha * (1 - minAlpha)
-				local info = animate and TI_FAST or TweenInfo.new(0)
+				local info = animate and TI_SMOOTH or TweenInfo.new(0)
 				tween(fill, info, {Size = UDim2.new(shown, 0, 1, 0)})
 				tween(knob, info, {Position = UDim2.new(shown, 0, 0.5, 0)})
 				valueLabel.Text = fmt(Slider.CurrentValue)
@@ -1585,6 +2029,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(38, 29)})
 					local alpha = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
 					setFromAlpha(math.clamp(alpha, 0, 1))
 				end
@@ -1592,6 +2037,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = false
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 27)})
 				end
 			end)
 			connect(UserInputService.InputChanged, function(input)
@@ -1601,8 +2047,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 			end)
 			connect(UserInputService.InputEnded, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 					dragging = false
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 27)})
 				end
 			end)
 
@@ -1624,19 +2071,19 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		function Tab:CreateInput(InputSettings)
 			InputSettings = InputSettings or {}
-			local card = makeCard(page, InputSettings.Name, InputSettings.Icon, 48)
+			local card = makeCard(page, InputSettings.Name, InputSettings.Icon, 50)
 			makeDescription(page, card, InputSettings.Description)
 			hoverable(card)
 
 			local boxHolder = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -12, 0.5, 0),
-				Size = UDim2.fromOffset(170, 32),
+				Position = UDim2.new(1, -13, 0.5, 0),
+				Size = UDim2.fromOffset(172, 32),
 				Parent = card,
 			})
 			paint(boxHolder, "BackgroundColor3", "CardHover")
 			round(boxHolder, 10)
-			local boxStroke = strokeOn(boxHolder, "Stroke", 0.6)
+			local boxStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.88, Parent = boxHolder})
 
 			local box = create("TextBox", {
 				BackgroundTransparency = 1,
@@ -1660,10 +2107,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 			}
 
 			box.Focused:Connect(function()
-				tween(boxStroke, TI_FAST, {Transparency = 0.2})
+				tween(boxStroke, TI_FAST, {Transparency = 0.5})
 			end)
 			box.FocusLost:Connect(function()
-				tween(boxStroke, TI_FAST, {Transparency = 0.6})
+				tween(boxStroke, TI_FAST, {Transparency = 0.88})
 				Input.CurrentValue = box.Text
 				runCallback(InputSettings.Callback, box.Text)
 				if InputSettings.RemoveTextAfterFocusLost then
@@ -1701,28 +2148,27 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local wrapper = create("Frame", {
 				BackgroundTransparency = 1,
 				AutomaticSize = Enum.AutomaticSize.Y,
-				Size = UDim2.new(1, 0, 0, 48),
+				Size = UDim2.new(1, 0, 0, 50),
 				LayoutOrder = nextOrder(),
 				Parent = page,
 			})
 			wrapper:SetAttribute("SearchName", DropdownSettings.Name or "")
 
 			local card = create("Frame", {
-				Size = UDim2.new(1, 0, 0, 48),
+				Size = UDim2.new(1, 0, 0, 50),
 				Parent = wrapper,
 			})
 			paint(card, "BackgroundColor3", "Card")
-			round(card, 14)
-			strokeOn(card, "Stroke", 0.75)
+			cardBase(card)
 			hoverable(card)
 
-			local textX = 16
+			local textX = 17
 			if DropdownSettings.Icon then
-				local ic = makeIcon(card, DropdownSettings.Icon, 18, Theme.TextTitle, 0.05)
+				local ic = makeIcon(card, DropdownSettings.Icon, 18, Theme.TextTitle, 0.04)
 				if ic then
 					ic.AnchorPoint = Vector2.new(0, 0.5)
-					ic.Position = UDim2.new(0, 15, 0.5, 0)
-					textX = 42
+					ic.Position = UDim2.new(0, 16, 0.5, 0)
+					textX = 44
 				end
 			end
 			local label = create("TextLabel", {
@@ -1742,30 +2188,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local chevron = create("ImageLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -14, 0.5, 0),
+				Position = UDim2.new(1, -15, 0.5, 0),
 				Size = UDim2.fromOffset(16, 16),
 				ImageColor3 = Theme.TextSub,
 				Parent = card,
 			})
-			task.spawn(function()
-				for _ = 1, 40 do
-					local asset = getLucide("chevron-down")
-					if asset then
-						chevron.Image = "rbxassetid://" .. tostring(asset.id)
-						chevron.ImageRectSize = asset.size
-						chevron.ImageRectOffset = asset.offset
-						return
-					end
-					task.wait(0.25)
-					if not chevron.Parent then return end
-				end
-			end)
+			applyLucide(chevron, {"chevron-down"})
 
 			local currentLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -38, 0.5, 0),
-				Size = UDim2.new(0.4, -38, 0, 16),
+				Position = UDim2.new(1, -39, 0.5, 0),
+				Size = UDim2.new(0.4, -39, 0, 16),
 				Font = FONT_MEDIUM,
 				TextSize = 14,
 				TextXAlignment = Enum.TextXAlignment.Right,
@@ -1778,17 +2212,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local OPTION_H = 42
 			local SEARCH_H = 40
 			local GAP = 6
-			local MAX_LIST = 236
+			local MAX_LIST = 240
 
 			local listHolder = create("ScrollingFrame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(0, 54),
+				Position = UDim2.fromOffset(0, 56),
 				Size = UDim2.new(1, 0, 0, 0),
 				CanvasSize = UDim2.new(0, 0, 0, 0),
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				ScrollBarThickness = 2,
-				ScrollBarImageColor3 = Color3.fromRGB(70, 70, 70),
+				ScrollBarImageColor3 = Color3.fromRGB(90, 90, 90),
 				BorderSizePixel = 0,
 				ClipsDescendants = true,
 				Visible = false,
@@ -1813,13 +2247,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local sIcon = makeIcon(searchRow, "text-search", 16, Theme.TextSub)
 				if sIcon then
 					sIcon.AnchorPoint = Vector2.new(0, 0.5)
-					sIcon.Position = UDim2.new(0, 12, 0.5, 0)
+					sIcon.Position = UDim2.new(0, 13, 0.5, 0)
 				end
 			end
 			local optionSearch = create("TextBox", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(36, 0),
-				Size = UDim2.new(1, -44, 1, 0),
+				Position = UDim2.fromOffset(38, 0),
+				Size = UDim2.new(1, -46, 1, 0),
 				Font = FONT_MEDIUM,
 				TextSize = 14,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1886,7 +2320,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					local selected = isSelected(row.option)
 					row.frame.BackgroundColor3 = selected and Theme.CardSelected or Theme.CardInset
 					row.check.Visible = selected
-					row.label.Position = UDim2.new(0, selected and 42 or 16, 0.5, 0)
+					row.label.Position = UDim2.new(0, selected and 44 or 17, 0.5, 0)
 					row.label.TextColor3 = selected and Theme.TextTitle or Theme.TextSub
 				end
 			end
@@ -1911,7 +2345,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				runCallback(DropdownSettings.Callback, Dropdown.CurrentOption)
 				saveConfiguration()
 				if not multiple then
-					task.delay(0.1, function() setOpen(false) end)
+					task.delay(0.12, function() setOpen(false) end)
 				end
 			end
 
@@ -1930,30 +2364,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 					local check = create("ImageLabel", {
 						BackgroundTransparency = 1,
 						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.new(0, 14, 0.5, 0),
+						Position = UDim2.new(0, 15, 0.5, 0),
 						Size = UDim2.fromOffset(18, 18),
 						ImageColor3 = Theme.TextTitle,
 						Visible = false,
 						Parent = row,
 					})
-					task.spawn(function()
-						for _ = 1, 40 do
-							local asset = firstLucide({"square-check", "check-square", "check"})
-							if asset then
-								check.Image = "rbxassetid://" .. tostring(asset.id)
-								check.ImageRectSize = asset.size
-								check.ImageRectOffset = asset.offset
-								return
-							end
-							task.wait(0.25)
-							if not check.Parent then return end
-						end
-					end)
+					applyLucide(check, {"square-check", "check-square", "check"})
 					local optionLabel = create("TextLabel", {
 						BackgroundTransparency = 1,
 						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.new(0, 16, 0.5, 0),
-						Size = UDim2.new(1, -60, 0, 16),
+						Position = UDim2.new(0, 17, 0.5, 0),
+						Size = UDim2.new(1, -62, 0, 16),
 						Font = FONT_MEDIUM,
 						TextSize = 15,
 						TextXAlignment = Enum.TextXAlignment.Left,
@@ -2046,19 +2468,19 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		function Tab:CreateKeybind(KeybindSettings)
 			KeybindSettings = KeybindSettings or {}
-			local card = makeCard(page, KeybindSettings.Name, KeybindSettings.Icon, 48)
+			local card = makeCard(page, KeybindSettings.Name, KeybindSettings.Icon, 50)
 			makeDescription(page, card, KeybindSettings.Description)
 			hoverable(card)
 
 			local keyHolder = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -12, 0.5, 0),
+				Position = UDim2.new(1, -13, 0.5, 0),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Size = UDim2.fromOffset(34, 30),
 			})
 			paint(keyHolder, "BackgroundColor3", "CardHover")
 			round(keyHolder, 10)
-			local keyStroke = strokeOn(keyHolder, "Stroke", 0.6)
+			local keyStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.88, Parent = keyHolder})
 			keyHolder.Parent = card
 			local keyLabel = create("TextLabel", {
 				BackgroundTransparency = 1,
@@ -2070,7 +2492,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = keyHolder,
 			})
 			paint(keyLabel, "TextColor3", "TextBody")
-			padAll(keyHolder, 0, 8, 0, 8)
+			padAll(keyHolder, 0, 9, 0, 9)
 
 			local Keybind = {
 				Type = "Keybind",
@@ -2089,14 +2511,14 @@ function RayfieldLibrary:CreateWindow(Settings)
 			clicker.MouseButton1Click:Connect(function()
 				listening = true
 				keyLabel.Text = "..."
-				tween(keyStroke, TI_FAST, {Transparency = 0.15})
+				tween(keyStroke, TI_FAST, {Transparency = 0.4})
 			end)
 
 			connect(UserInputService.InputBegan, function(input, processed)
 				if listening then
 					if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
 						listening = false
-						tween(keyStroke, TI_FAST, {Transparency = 0.6})
+						tween(keyStroke, TI_FAST, {Transparency = 0.88})
 						if input.KeyCode == Enum.KeyCode.Escape then
 							keyLabel.Text = Keybind.CurrentKeybind
 							return
@@ -2151,28 +2573,27 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local wrapper = create("Frame", {
 				BackgroundTransparency = 1,
 				AutomaticSize = Enum.AutomaticSize.Y,
-				Size = UDim2.new(1, 0, 0, 48),
+				Size = UDim2.new(1, 0, 0, 50),
 				LayoutOrder = nextOrder(),
 				Parent = page,
 			})
 			wrapper:SetAttribute("SearchName", ColorPickerSettings.Name or "")
 
 			local card = create("Frame", {
-				Size = UDim2.new(1, 0, 0, 48),
+				Size = UDim2.new(1, 0, 0, 50),
 				Parent = wrapper,
 			})
 			paint(card, "BackgroundColor3", "Card")
-			round(card, 14)
-			strokeOn(card, "Stroke", 0.75)
+			cardBase(card)
 			hoverable(card)
 
-			local textX = 16
+			local textX = 17
 			if ColorPickerSettings.Icon then
-				local ic = makeIcon(card, ColorPickerSettings.Icon, 18, Theme.TextTitle, 0.05)
+				local ic = makeIcon(card, ColorPickerSettings.Icon, 18, Theme.TextTitle, 0.04)
 				if ic then
 					ic.AnchorPoint = Vector2.new(0, 0.5)
-					ic.Position = UDim2.new(0, 15, 0.5, 0)
-					textX = 42
+					ic.Position = UDim2.new(0, 16, 0.5, 0)
+					textX = 44
 				end
 			end
 			local label = create("TextLabel", {
@@ -2191,17 +2612,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			local swatch = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -14, 0.5, 0),
-				Size = UDim2.fromOffset(40, 26),
+				Position = UDim2.new(1, -15, 0.5, 0),
+				Size = UDim2.fromOffset(42, 26),
 				BackgroundColor3 = color,
 				Parent = card,
 			})
-			round(swatch, 8)
-			strokeOn(swatch, "Stroke", 0.4)
+			round(swatch, 9)
+			create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.8, Parent = swatch})
 
 			local panel = create("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(0, 54),
+				Position = UDim2.fromOffset(0, 56),
 				Size = UDim2.new(1, 0, 0, 0),
 				ClipsDescendants = true,
 				Parent = wrapper,
@@ -2233,11 +2654,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 			end
 
 			for i, def in ipairs(channelDefs) do
-				local rowY = (i - 1) * 34
+				local rowY = (i - 1) * 34 + 4
 				local row = create("Frame", {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(0, rowY),
-					Size = UDim2.new(1, 0, 0, 28),
+					Position = UDim2.fromOffset(4, rowY),
+					Size = UDim2.new(1, -8, 0, 28),
 					Parent = panel,
 				})
 				local tag = create("TextLabel", {
@@ -2252,17 +2673,25 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local track = create("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
 					Position = UDim2.new(0, 30, 0.5, 0),
-					Size = UDim2.new(1, -86, 0, 12),
-					BackgroundColor3 = Color3.fromRGB(52, 52, 52),
+					Size = UDim2.new(1, -86, 0, 14),
+					BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+					BackgroundTransparency = 0.25,
 					Parent = row,
 				})
 				roundFull(track)
 				local fill = create("Frame", {
 					Size = UDim2.new(0.5, 0, 1, 0),
+					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 					Parent = track,
 				})
-				paint(fill, "BackgroundColor3", "Accent")
 				roundFull(fill)
+				create("UIGradient", {
+					Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Theme.AccentDark),
+						ColorSequenceKeypoint.new(1, Theme.AccentSoft),
+					}),
+					Parent = fill,
+				})
 				local valueLabel = create("TextLabel", {
 					BackgroundTransparency = 1,
 					AnchorPoint = Vector2.new(1, 0),
@@ -2280,7 +2709,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				channels[i] = channel
 
 				local function render()
-					fill.Size = UDim2.new(channel.value / 255, 0, 1, 0)
+					fill.Size = UDim2.new(math.max(channel.value / 255, 0.02), 0, 1, 0)
 					valueLabel.Text = tostring(channel.value)
 				end
 				channel.render = render
@@ -2320,7 +2749,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			clicker.MouseButton1Click:Connect(function()
 				open = not open
-				tween(panel, TI_MED, {Size = UDim2.new(1, 0, 0, open and 3 * 34 or 0)})
+				tween(panel, TI_MED, {Size = UDim2.new(1, 0, 0, open and (3 * 34 + 8) or 0)})
 			end)
 
 			function ColorPicker:Set(newColor)
@@ -2343,23 +2772,24 @@ function RayfieldLibrary:CreateWindow(Settings)
 		return Tab
 	end
 
-	-- Window:CreateTab --------------------------------------------------
+	-- Window:CreateTab
 
-	function Window:CreateTab(tabName, tabImage, ext)
-		local page = buildPage()
+	function Window:CreateTab(tabName, tabImage, _ext)
+		local page, pageWrapper = buildPage()
 		local Tab = buildTabAPI(page)
 
 		local pill = create("TextButton", {
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.new(0, 0, 0, 38),
 			Text = "",
+			BackgroundTransparency = 0.25,
 			LayoutOrder = #tabs + 1,
 			Parent = tabBar,
 		})
 		pill.BackgroundColor3 = Theme.CardInset
 		roundFull(pill)
-		local pillStroke = strokeOn(pill, "Stroke", 0.75)
-		padAll(pill, 0, 16, 0, 16)
+		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9, Parent = pill})
+		padAll(pill, 0, 17, 0, 17)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -2368,8 +2798,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Parent = pill,
 		})
 		local pillIcon = nil
-		if tabImage then
-			pillIcon = makeIcon(pill, tabImage, 16, Theme.TextSub)
+		if tabImage and tabImage ~= 0 and tabImage ~= "" then
+			pillIcon = makeIcon(pill, tabImage, 17, Theme.TextSub)
 			if pillIcon then pillIcon.LayoutOrder = 1 end
 		end
 		local pillLabel = create("TextLabel", {
@@ -2387,6 +2817,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		local tabEntry = {
 			Name = tabName,
 			Page = page,
+			Wrapper = pageWrapper,
 			Pill = pill,
 			PillLabel = pillLabel,
 			PillIcon = pillIcon,
@@ -2395,18 +2826,31 @@ function RayfieldLibrary:CreateWindow(Settings)
 		}
 		table.insert(tabs, tabEntry)
 
+		pill.MouseEnter:Connect(function()
+			if currentTab ~= tabEntry or settingsOpen then
+				tween(pill, TI_FAST, {BackgroundTransparency = 0.1})
+			end
+		end)
+		pill.MouseLeave:Connect(function()
+			if currentTab ~= tabEntry or settingsOpen then
+				tween(pill, TI_FAST, {BackgroundTransparency = 0.25})
+			end
+		end)
 		pill.MouseButton1Click:Connect(function()
 			selectTab(tabEntry)
 		end)
 
 		if #tabs == 1 then
-			selectTab(tabEntry)
+			currentTab = tabEntry
+			settingsOpen = false
+			styleTabPills()
+			pageWrapper.Visible = true
 		end
 
 		return Tab
 	end
 
-	-- settings page ------------------------------------------------------
+	-- settings page
 
 	local toggleKeyName = "K"
 	if Settings.ToggleUIKeybind then
@@ -2418,8 +2862,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 	end
 
 	local function buildSettingsPage()
-		settingsPage = buildPage()
-		local SettingsTab = buildTabAPI(settingsPage)
+		local page, pageWrapper = buildPage()
+		settingsEntry = {Page = page, Wrapper = pageWrapper}
+		local SettingsTab = buildTabAPI(page)
 		SettingsTab:CreateSection("Interface")
 		SettingsTab:CreateKeybind({
 			Name = "Toggle UI",
@@ -2447,20 +2892,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 	end
 
 	settingsButton.MouseButton1Click:Connect(function()
-		if not settingsPage then buildSettingsPage() end
+		if not settingsEntry then buildSettingsPage() end
 		settingsOpen = not settingsOpen
+		styleTabPills()
 		if settingsOpen then
-			for _, other in ipairs(tabs) do
-				other.Page.Visible = false
-			end
-			settingsPage.Visible = true
-		else
-			settingsPage.Visible = false
-			if currentTab then currentTab.Page.Visible = true end
+			showPage(settingsEntry)
+		elseif currentTab then
+			showPage(currentTab)
 		end
 	end)
 
-	-- dragging -----------------------------------------------------------
+	-- dragging with a smooth tween follow, like original Rayfield
 
 	local function makeDraggable(zone)
 		local dragging = false
@@ -2482,26 +2924,22 @@ function RayfieldLibrary:CreateWindow(Settings)
 		connect(UserInputService.InputChanged, function(input)
 			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 				local delta = input.Position - dragStart
-				root.Position = UDim2.new(
-					startPos.X.Scale, startPos.X.Offset + delta.X,
-					startPos.Y.Scale, startPos.Y.Offset + delta.Y
-				)
+				tween(root, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+					Position = UDim2.new(
+						startPos.X.Scale, startPos.X.Offset + delta.X,
+						startPos.Y.Scale, startPos.Y.Offset + delta.Y
+					),
+				})
 			end
 		end)
 	end
 	makeDraggable(header)
 	makeDraggable(handle)
 
-	-- minimize and hide ----------------------------------------------------
+	-- minimize and hide
 
 	local function setMinimizeIcon(restore)
-		local names = restore and {"maximize-2", "expand"} or {"minus"}
-		local asset = firstLucide(names)
-		if asset then
-			minimizeIcon.Image = "rbxassetid://" .. tostring(asset.id)
-			minimizeIcon.ImageRectSize = asset.size
-			minimizeIcon.ImageRectOffset = asset.offset
-		end
+		applyLucide(minimizeIcon, restore and {"maximize-2", "expand"} or {"minus"})
 	end
 
 	local function setMinimized(value)
@@ -2515,19 +2953,24 @@ function RayfieldLibrary:CreateWindow(Settings)
 		setMinimized(not minimized)
 	end)
 
+	-- hide and show, matching the Gen2 morph animation:
+	-- content fades, the frame flies to the top center while shrinking into
+	-- a pill, then the pill content fades in. showing reverses it.
+
 	local function hideWindow()
 		if morphing or hidden then return end
 		morphing = true
 		hidden = true
 		storedPosition = root.Position
-		handle.Visible = false
-		tween(main, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1})
-		task.wait(0.15)
+		tween(handle, TI_FAST, {BackgroundTransparency = 1})
+		tween(main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1})
+		task.wait(0.17)
 		main.Visible = false
-		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 26)})
+		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, math.floor(PILL_H / 2))})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(PILL_W, PILL_H)})
-		tween(root, TI_MORPH, {Position = UDim2.new(0.5, 0, 0, 18)})
-		task.wait(0.3)
+		tween(shadow, TI_MORPH, {ImageTransparency = 0.55})
+		tween(root, TI_MORPH, {Position = UDim2.new(0.5, 0, 0, 16)})
+		task.wait(0.34)
 		pillContent.Visible = true
 		pillButton.Visible = true
 		tween(pillContent, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
@@ -2538,17 +2981,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 		if morphing or not hidden then return end
 		morphing = true
 		hidden = false
-		tween(pillContent, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1})
-		task.wait(0.13)
+		tween(pillContent, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1})
+		task.wait(0.14)
 		pillContent.Visible = false
 		pillButton.Visible = false
-		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 18)})
+		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 20)})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(WINDOW_W, minimized and HEADER_H or WINDOW_H)})
+		tween(shadow, TI_MORPH, {ImageTransparency = 0.42})
 		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
-		task.wait(0.32)
+		task.wait(0.36)
 		main.Visible = true
-		tween(main, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
-		handle.Visible = true
+		tween(main, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
+		tween(handle, TI_MED, {BackgroundTransparency = 0.35})
 		morphing = false
 	end
 
@@ -2557,6 +3001,14 @@ function RayfieldLibrary:CreateWindow(Settings)
 	end)
 	pillButton.MouseButton1Click:Connect(function()
 		task.spawn(showWindow)
+	end)
+	pillButton.MouseEnter:Connect(function()
+		if hidden and not morphing then
+			tween(window, TI_FAST, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
+		end
+	end)
+	pillButton.MouseLeave:Connect(function()
+		tween(window, TI_FAST, {BackgroundColor3 = Theme.Background})
 	end)
 
 	connect(UserInputService.InputBegan, function(input, processed)
@@ -2570,12 +3022,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end)
 
-	-- library level window controls
 	RayfieldLibrary._hideWindow = hideWindow
 	RayfieldLibrary._showWindow = showWindow
 	RayfieldLibrary._isHidden = function() return hidden end
 
-	-- Window API -----------------------------------------------------------
+	-- Window API
 
 	function Window.ModifyTheme(newTheme)
 		if type(newTheme) == "table" then
@@ -2596,14 +3047,84 @@ function RayfieldLibrary:CreateWindow(Settings)
 		subtitleLabel.Text = newSubtitle or subtitleLabel.Text
 	end
 
-	-- entrance animation
-	window.Size = UDim2.fromOffset(WINDOW_W - 40, WINDOW_H - 48)
-	handle.BackgroundTransparency = 1
-	tween(window, TI_SLOW, {Size = UDim2.fromOffset(WINDOW_W, WINDOW_H)})
-	tween(main, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
-	tween(handle, TI_SLOW, {BackgroundTransparency = 0.35})
+	-- entrance, with an optional loading card that expands into the window
 
-	-- config load ----------------------------------------------------------
+	local hasLoading = (Settings.LoadingTitle and Settings.LoadingTitle ~= "") or (Settings.LoadingSubtitle and Settings.LoadingSubtitle ~= "")
+
+	if hasLoading then
+		local LOAD_W, LOAD_H = 320, 140
+		window.Size = UDim2.fromOffset(LOAD_W, LOAD_H)
+		root.Position = UDim2.new(0.5, 0, 0.5, -math.floor(LOAD_H / 2) - 9)
+
+		local loading = create("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(LOAD_W, LOAD_H),
+			ZIndex = 5,
+			Parent = window,
+		})
+		local spinner = create("ImageLabel", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 26),
+			Size = UDim2.fromOffset(24, 24),
+			ImageColor3 = Theme.TextTitle,
+			ImageTransparency = 0,
+			Parent = loading,
+		})
+		applyLucide(spinner, {"loader"})
+		tween(spinner, TweenInfo.new(1.1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1), {Rotation = 360})
+		create("TextLabel", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 62),
+			Size = UDim2.new(1, -40, 0, 22),
+			Font = FONT_BOLD,
+			TextSize = 18,
+			Text = Settings.LoadingTitle or Settings.Name or "Rayfield",
+			TextColor3 = Theme.TextTitle,
+			Parent = loading,
+		})
+		create("TextLabel", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 88),
+			Size = UDim2.new(1, -40, 0, 18),
+			Font = FONT_MEDIUM,
+			TextSize = 14,
+			Text = Settings.LoadingSubtitle or "Rayfield Gen2",
+			TextColor3 = Theme.TextSub,
+			Parent = loading,
+		})
+
+		task.spawn(function()
+			task.wait(1.15)
+			if destroyed or not window.Parent then return end
+			tween(loading, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+			for _, child in ipairs(loading:GetChildren()) do
+				if child:IsA("TextLabel") then
+					tween(child, TweenInfo.new(0.16), {TextTransparency = 1})
+				elseif child:IsA("ImageLabel") then
+					tween(child, TweenInfo.new(0.16), {ImageTransparency = 1})
+				end
+			end
+			task.wait(0.16)
+			loading:Destroy()
+			tween(window, TI_SLOW, {Size = UDim2.fromOffset(WINDOW_W, WINDOW_H)})
+			tween(root, TI_SLOW, {Position = shownPosition})
+			task.wait(0.18)
+			tween(main, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
+			tween(handle, TI_SLOW, {BackgroundTransparency = 0.35})
+		end)
+	else
+		window.Size = UDim2.fromOffset(WINDOW_W - 48, WINDOW_H - 56)
+		shadow.ImageTransparency = 1
+		tween(window, TI_SLOW, {Size = UDim2.fromOffset(WINDOW_W, WINDOW_H)})
+		tween(shadow, TI_SLOW, {ImageTransparency = 0.42})
+		tween(main, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
+		tween(handle, TI_SLOW, {BackgroundTransparency = 0.35})
+	end
+
+	-- config load
 
 	function RayfieldLibrary:LoadConfiguration()
 		if not configEnabled then return end
@@ -2629,7 +3150,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 	return Window
 end
 
--- visibility and teardown --------------------------------------------------
+-- visibility and teardown
 
 function RayfieldLibrary:IsVisible()
 	if RayfieldLibrary._isHidden then
