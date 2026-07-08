@@ -1287,7 +1287,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = main,
 	})
 
-	local TABBAR_H = 40
+	local TABBAR_H = 44
 	local tabBar = create("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, TABBAR_H),
@@ -1487,12 +1487,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local function styleTabPills()
 		for _, other in ipairs(tabs) do
 			local active = (not settingsOpen) and other == currentTab
-			tween(other.Pill, TI_FAST, {BackgroundColor3 = active and Theme.CardHover or Theme.CardInset, BackgroundTransparency = active and 0 or 0.25})
+			tween(other.Pill, TI_FAST, {BackgroundColor3 = active and Theme.CardHover or Theme.CardInset, BackgroundTransparency = active and 0 or 0.45})
 			tween(other.PillLabel, TI_FAST, {TextColor3 = active and Theme.TextTitle or Theme.TextSub})
 			if other.PillIcon then
 				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
 			end
-			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.82 or 0.9})
+			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.66 or 0.78})
 		end
 		tween(settingsButtonIcon, TI_FAST, {ImageColor3 = settingsOpen and Theme.TextTitle or Theme.TextSub, Rotation = settingsOpen and 90 or 0})
 	end
@@ -3003,16 +3003,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		local pill = create("TextButton", {
 			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 0, 38),
+			Size = UDim2.new(0, 0, 0, 42),
 			Text = "",
-			BackgroundTransparency = 0.25,
+			BackgroundTransparency = 0.45,
 			LayoutOrder = #tabs + 1,
 			Parent = tabBar,
 		})
 		pill.BackgroundColor3 = Theme.CardInset
 		roundFull(pill)
-		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9, Parent = pill})
-		padAll(pill, 0, 17, 0, 17)
+		-- the ring is what defines the pill, visible in both states
+		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.78, Parent = pill})
+		padAll(pill, 0, 20, 0, 20)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -3022,7 +3023,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		})
 		local pillIcon = nil
 		if tabImage and tabImage ~= 0 and tabImage ~= "" then
-			pillIcon = makeIcon(pill, tabImage, 17, Theme.TextSub)
+			pillIcon = makeIcon(pill, tabImage, 18, Theme.TextSub)
 			if pillIcon then pillIcon.LayoutOrder = 1 end
 		end
 		local pillLabel = create("TextLabel", {
@@ -3030,7 +3031,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.new(0, 0, 1, 0),
 			Font = FONT_MEDIUM,
-			TextSize = 15,
+			TextSize = 16,
 			Text = tabName or "Tab",
 			TextColor3 = Theme.TextSub,
 			LayoutOrder = 2,
@@ -3051,12 +3052,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		pill.MouseEnter:Connect(function()
 			if currentTab ~= tabEntry or settingsOpen then
-				tween(pill, TI_FAST, {BackgroundTransparency = 0.1})
+				tween(pill, TI_FAST, {BackgroundTransparency = 0.2})
 			end
 		end)
 		pill.MouseLeave:Connect(function()
 			if currentTab ~= tabEntry or settingsOpen then
-				tween(pill, TI_FAST, {BackgroundTransparency = 0.25})
+				tween(pill, TI_FAST, {BackgroundTransparency = 0.45})
 			end
 		end)
 		pill.MouseButton1Click:Connect(function()
