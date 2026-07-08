@@ -1102,7 +1102,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end)
 
-	local WINDOW_W, WINDOW_H = 500, 550
+	local WINDOW_W, WINDOW_H = 530, 550
 	local HEADER_H = 76
 	local PILL_H = 62
 
@@ -1151,7 +1151,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = root,
 	})
 	paint(window, "BackgroundColor3", "Background")
-	local windowCorner = round(window, 14)
+	local windowCorner = round(window, 18)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Parent = window})
 	create("UIGradient", {
 		Rotation = 90,
@@ -1411,8 +1411,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local body = create("Frame", {
 		Name = "Body",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(20, HEADER_H),
-		Size = UDim2.new(1, -40, 1, -HEADER_H - 14),
+		Position = UDim2.fromOffset(14, HEADER_H),
+		Size = UDim2.new(1, -28, 1, -HEADER_H - 14),
 		Parent = main,
 	})
 
@@ -2303,7 +2303,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(38, 28)})
 					local alpha = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
 					setFromAlpha(math.clamp(alpha, 0, 1))
 				end
@@ -2311,7 +2310,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 26)})
 				end
 			end)
 			connect(UserInputService.InputChanged, function(input)
@@ -2323,7 +2321,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			connect(UserInputService.InputEnded, function(input)
 				if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 26)})
 				end
 			end)
 
@@ -3352,7 +3349,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		task.wait(0.14)
 		pillContent.Visible = false
 		pillButton.Visible = false
-		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 14)})
+		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 18)})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(WINDOW_W, minimized and HEADER_H or WINDOW_H)})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.42})
 		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
