@@ -2081,15 +2081,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local track
 			if compact then
 				track = create("Frame", {
-					Position = UDim2.fromOffset(15, 43),
-					Size = UDim2.new(1, -30, 0, 22),
+					Position = UDim2.fromOffset(15, 46),
+					Size = UDim2.new(1, -30, 0, 16),
 					BackgroundColor3 = Color3.fromRGB(47, 47, 47),
 				})
 			else
 				track = create("Frame", {
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, -17, 0.5, 0),
-					Size = UDim2.new(0.46, 0, 0, 22),
+					Size = UDim2.new(0.46, 0, 0, 16),
 					BackgroundColor3 = Color3.fromRGB(47, 47, 47),
 				})
 			end
@@ -2115,7 +2115,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0.5, 0, 0.5, 0),
-				Size = UDim2.fromOffset(46, 34),
+				Size = UDim2.fromOffset(36, 26),
 				ZIndex = 3,
 			})
 			paint(knob, "BackgroundColor3", "Knob")
@@ -2174,7 +2174,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(48, 36)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(38, 28)})
 					local alpha = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
 					setFromAlpha(math.clamp(alpha, 0, 1))
 				end
@@ -2182,7 +2182,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(46, 34)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 26)})
 				end
 			end)
 			connect(UserInputService.InputChanged, function(input)
@@ -2194,7 +2194,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			connect(UserInputService.InputEnded, function(input)
 				if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(46, 34)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 26)})
 				end
 			end)
 
