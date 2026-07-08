@@ -2083,15 +2083,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local track
 			if compact then
 				track = create("Frame", {
-					Position = UDim2.fromOffset(15, 45),
-					Size = UDim2.new(1, -30, 0, 18),
+					Position = UDim2.fromOffset(15, 41),
+					Size = UDim2.new(1, -30, 0, 26),
 					BackgroundColor3 = Color3.fromRGB(56, 56, 56),
 				})
 			else
 				track = create("Frame", {
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, -17, 0.5, 0),
-					Size = UDim2.new(0.46, 0, 0, 18),
+					Size = UDim2.new(0.46, 0, 0, 26),
 					BackgroundColor3 = Color3.fromRGB(56, 56, 56),
 				})
 			end
@@ -2106,22 +2106,23 @@ function RayfieldLibrary:CreateWindow(Settings)
 			roundFull(fill)
 			create("UIGradient", {
 				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Theme.AccentDark),
-					ColorSequenceKeypoint.new(1, Theme.AccentSoft),
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(124, 178, 148)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(62, 158, 110)),
 				}),
 				Parent = fill,
 			})
-			softGlow(fill, Theme.Accent, 0.7, 22)
+			softGlow(fill, Theme.Accent, 0.75, 24)
 
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0.5, 0, 0.5, 0),
-				Size = UDim2.fromOffset(40, 28),
+				Size = UDim2.fromOffset(46, 34),
 				ZIndex = 3,
 			})
 			paint(knob, "BackgroundColor3", "Knob")
 			roundFull(knob)
-			softGlow(knob, Color3.fromRGB(255, 255, 255), 0.55, 28, 2)
+			-- tight white halo, not a big bloom
+			softGlow(knob, Color3.fromRGB(255, 255, 255), 0.7, 14, 2)
 			knob.Parent = track
 
 			local Slider = {
@@ -2176,7 +2177,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(42, 30)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(48, 36)})
 					local alpha = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
 					setFromAlpha(math.clamp(alpha, 0, 1))
 				end
@@ -2184,7 +2185,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(40, 28)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(46, 34)})
 				end
 			end)
 			connect(UserInputService.InputChanged, function(input)
@@ -2196,7 +2197,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			connect(UserInputService.InputEnded, function(input)
 				if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(40, 28)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(46, 34)})
 				end
 			end)
 
