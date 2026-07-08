@@ -1001,11 +1001,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Name = "Shadow",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, -26),
-		Size = UDim2.fromOffset(WINDOW_W + 52, WINDOW_H + 52),
+		Position = UDim2.new(0.5, 0, 0, -18),
+		Size = UDim2.fromOffset(WINDOW_W + 36, WINDOW_H + 36),
 		Image = GLOW_IMAGE,
 		ImageColor3 = Color3.fromRGB(0, 0, 0),
-		ImageTransparency = 0.42,
+		ImageTransparency = 0.6,
 		ScaleType = Enum.ScaleType.Slice,
 		SliceCenter = Rect.new(49, 49, 450, 450),
 		ZIndex = 0,
@@ -1022,8 +1022,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = root,
 	})
 	paint(window, "BackgroundColor3", "Background")
-	-- corner kept close to original Rayfield, not the big 20px rounding
-	local windowCorner = round(window, 10)
+	local windowCorner = round(window, 14)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Parent = window})
 	create("UIGradient", {
 		Rotation = 90,
@@ -1056,7 +1055,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 	connect(window:GetPropertyChangedSignal("Size"), function()
 		local size = window.Size
 		handle.Position = UDim2.new(0.5, 0, 0, size.Y.Offset + 12)
-		shadow.Size = UDim2.fromOffset(size.X.Offset + 52, size.Y.Offset + 52)
+		shadow.Size = UDim2.fromOffset(size.X.Offset + 36, size.Y.Offset + 36)
 	end)
 
 	-- pill contents for the hidden state
@@ -3220,7 +3219,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		task.wait(0.14)
 		pillContent.Visible = false
 		pillButton.Visible = false
-		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 10)})
+		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 14)})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(WINDOW_W, minimized and HEADER_H or WINDOW_H)})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.42})
 		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
