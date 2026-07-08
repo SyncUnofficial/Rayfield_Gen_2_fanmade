@@ -1022,7 +1022,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = root,
 	})
 	paint(window, "BackgroundColor3", "Background")
-	local windowCorner = round(window, 18)
+	local windowCorner = round(window, 24)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Parent = window})
 	create("UIGradient", {
 		Rotation = 90,
@@ -2121,7 +2121,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0.5, 0, 0.5, 0),
-				Size = UDim2.fromOffset(48, 26),
+				Size = UDim2.fromOffset(48, 22),
 				ZIndex = 3,
 			})
 			paint(knob, "BackgroundColor3", "Knob")
@@ -3226,7 +3226,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		task.wait(0.14)
 		pillContent.Visible = false
 		pillButton.Visible = false
-		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 18)})
+		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 24)})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(WINDOW_W, minimized and HEADER_H or WINDOW_H)})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.42})
 		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
