@@ -56,6 +56,50 @@ Home:CreateSlider({
 	end,
 })
 
+Home:CreateSection("Notifications")
+
+Home:CreateButton({
+	Name = "Send Notification",
+	Icon = "bell",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "Heads up",
+			Content = "This is a notification. Hover to pause it, or click to dismiss early.",
+			Duration = 5,
+			Image = "house",
+		})
+	end,
+})
+
+Home:CreateButton({
+	Name = "Send Long Notification",
+	Icon = "bell",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "Longer notification",
+			Content = "This one has a lot more text so you can check that the card grows to fit the content, wraps every line properly, and still slides in and out from the right side smoothly.",
+			Duration = 8,
+			Image = "messages-square",
+		})
+	end,
+})
+
+Home:CreateButton({
+	Name = "Send 3 Stacked",
+	Icon = "bell",
+	Callback = function()
+		for i = 1, 3 do
+			Rayfield:Notify({
+				Title = "Heads up",
+				Content = "This is a notification. Hover to pause it, or click to dismiss early.",
+				Duration = 4 + i,
+				Image = "house",
+			})
+			task.wait(0.45)
+		end
+	end,
+})
+
 Home:CreateSection("Interface")
 
 Home:CreateToggle({

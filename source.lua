@@ -442,15 +442,19 @@ local function ensureRoot()
 	end)
 	rootGui.Parent = getGuiParent()
 
+	-- bottom right stack, newest card at the bottom, older ones pushed up
 	notifyStack = create("Frame", {
 		Name = "Notifications",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(24, 24),
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -24, 1, -24),
 		Size = UDim2.fromOffset(330, 900),
 		Parent = rootGui,
 	})
 	create("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, 10),
 		Parent = notifyStack,
@@ -475,10 +479,19 @@ function RayfieldLibrary:Notify(data)
 		Parent = notifyStack,
 	})
 
-	local card = create("Frame", {
+	-- the holder slides, carrying the drop shadow and the card. the card is
+	-- a CanvasGroup so it fades as one piece; the shadow would be clipped
+	-- inside it, so it lives on the holder instead and fades separately
+	local holder = create("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Position = UDim2.fromOffset(370, 0),
+	})
+	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 38, 0)
+	local card = create("CanvasGroup", {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Size = UDim2.new(1, 0, 0, 0),
-		Position = UDim2.fromOffset(-370, 0),
+		GroupTransparency = 1,
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
 	round(card, 18)
@@ -488,7 +501,6 @@ function RayfieldLibrary:Notify(data)
 		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(170, 170, 170)),
 		Parent = card,
 	})
-	softGlow(card, Color3.fromRGB(0, 0, 0), 0.6, 38)
 	padAll(card, 15, 18, 15, 16)
 
 	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
@@ -555,7 +567,8 @@ function RayfieldLibrary:Notify(data)
 		Parent = card,
 	})
 
-	card.Parent = wrapper
+	card.Parent = holder
+	holder.Parent = wrapper
 
 	local paused = false
 	local dismissed = false
@@ -565,9 +578,13 @@ function RayfieldLibrary:Notify(data)
 	local function dismiss()
 		if dismissed then return end
 		dismissed = true
+		-- slide back out through the right edge while fading, then let the
+		-- stack settle down into the freed space
+		tween(holder, TI_SMOOTH, {Position = UDim2.fromOffset(390, 0)})
+		tween(card, TI_SMOOTH, {GroupTransparency = 1})
+		tween(glow, TI_SMOOTH, {ImageTransparency = 1})
+		task.wait(0.22)
 		wrapper.ClipsDescendants = true
-		tween(card, TI_SMOOTH, {Position = UDim2.fromOffset(-370, 0)})
-		task.wait(0.2)
 		tween(wrapper, TI_MED, {Size = UDim2.new(1, 0, 0, 0)})
 		task.wait(0.28)
 		wrapper:Destroy()
@@ -581,8 +598,10 @@ function RayfieldLibrary:Notify(data)
 		task.wait()
 		local height = card.AbsoluteSize.Y
 		wrapper.Size = UDim2.new(1, 0, 0, height)
-		card.Position = UDim2.fromOffset(-370, 0)
-		tween(card, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
+		holder.Position = UDim2.fromOffset(370, 0)
+		tween(holder, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
+		tween(card, TI_MORPH, {GroupTransparency = 0})
+		tween(glow, TI_MORPH, {ImageTransparency = 0.6})
 		-- unclip once in place so the soft shadow can bleed past the card
 		task.delay(0.3, function()
 			if not dismissed and wrapper.Parent then
@@ -617,7 +636,7 @@ local function showAccountToast()
 	local pill = create("Frame", {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.new(0, 0, 0, 54),
-		Position = UDim2.fromOffset(-280, 0),
+		Position = UDim2.fromOffset(280, 0),
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
 	roundFull(pill)
@@ -680,7 +699,7 @@ local function showAccountToast()
 	pill.Parent = wrapper
 	tween(pill, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
 	task.delay(4, function()
-		tween(pill, TI_SMOOTH, {Position = UDim2.fromOffset(-280, 0)})
+		tween(pill, TI_SMOOTH, {Position = UDim2.fromOffset(280, 0)})
 		task.wait(0.25)
 		tween(wrapper, TI_MED, {Size = UDim2.new(0, 240, 0, 0)})
 		task.wait(0.26)
