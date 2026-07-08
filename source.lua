@@ -139,6 +139,11 @@ end
 
 local function create(class, props, children)
 	local inst = Instance.new(class)
+	-- kill Roblox's built in hover/press color modulation everywhere so
+	-- buttons never flash darker unless we animate them ourselves
+	if class == "TextButton" or class == "ImageButton" then
+		inst.AutoButtonColor = false
+	end
 	local parent = nil
 	if props then
 		for k, v in pairs(props) do
