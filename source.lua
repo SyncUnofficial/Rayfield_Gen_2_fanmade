@@ -2077,21 +2077,20 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			paint(valueLabel, "TextColor3", "TextSub")
 
-			-- dark track, gradient green fill with a soft bloom, glowing
-			-- white pill knob with no ring
+			-- slim dark track, the knob stands taller than it
 			local track
 			if compact then
 				track = create("Frame", {
-					Position = UDim2.fromOffset(15, 41),
-					Size = UDim2.new(1, -30, 0, 26),
-					BackgroundColor3 = Color3.fromRGB(56, 56, 56),
+					Position = UDim2.fromOffset(15, 43),
+					Size = UDim2.new(1, -30, 0, 22),
+					BackgroundColor3 = Color3.fromRGB(47, 47, 47),
 				})
 			else
 				track = create("Frame", {
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, -17, 0.5, 0),
-					Size = UDim2.new(0.46, 0, 0, 26),
-					BackgroundColor3 = Color3.fromRGB(56, 56, 56),
+					Size = UDim2.new(0.46, 0, 0, 22),
+					BackgroundColor3 = Color3.fromRGB(47, 47, 47),
 				})
 			end
 			roundFull(track)
@@ -2103,14 +2102,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = track,
 			})
 			roundFull(fill)
+			-- dark green fading into vivid green right at the knob, flat
+			-- with no bloom, crisp glowless white knob like the mock
 			create("UIGradient", {
 				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Color3.fromRGB(124, 178, 148)),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(62, 158, 110)),
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 88, 66)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(74, 178, 124)),
 				}),
 				Parent = fill,
 			})
-			softGlow(fill, Theme.Accent, 0.75, 24)
 
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -2120,8 +2120,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			paint(knob, "BackgroundColor3", "Knob")
 			roundFull(knob)
-			-- tight white halo, not a big bloom
-			softGlow(knob, Color3.fromRGB(255, 255, 255), 0.7, 14, 2)
 			knob.Parent = track
 
 			local Slider = {
