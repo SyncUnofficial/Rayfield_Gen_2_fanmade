@@ -1954,8 +1954,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			descFor(card, ToggleSettings.Description)
 			hoverable(card)
 
-			-- wide flat track with a neutral ring. the ring stays gray in
-			-- both states, all the green comes from the knob and its glow
+			-- wide flat track with a neutral ring. the track and ring never
+			-- change, only the knob turns green when on
 			local track = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -15, 0.5, 0),
@@ -1970,9 +1970,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			track.Parent = card
 
-			-- tight halo hugging the pill, not a wash over the card
-			local trackGlow = softGlow(track, Theme.Accent, 1, 16)
-
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 3, 0.5, 0),
@@ -1985,7 +1982,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(196, 196, 196)),
 				Parent = knob,
 			})
-			local knobGlow = softGlow(knob, Theme.Accent, 1, 12)
 			knob.Parent = track
 
 			local Toggle = {
@@ -1999,12 +1995,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 				tween(knob, info, {
 					Position = on and UDim2.new(1, -31, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
 					BackgroundColor3 = on and Theme.Accent or Theme.KnobOff,
-				})
-				tween(knobGlow, info, {ImageTransparency = on and 0.8 or 1})
-				tween(trackGlow, info, {ImageTransparency = on and 0.86 or 1})
-				tween(trackStroke, info, {
-					Color = on and Theme.AccentSoft or Color3.fromRGB(255, 255, 255),
-					Transparency = on and 0.72 or 0.84,
 				})
 			end
 			render(false)
