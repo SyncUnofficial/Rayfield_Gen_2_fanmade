@@ -1455,9 +1455,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			CanvasSize = UDim2.new(0, 0, 0, 0),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
-			ScrollBarThickness = 3,
-			ScrollBarImageColor3 = Color3.fromRGB(90, 90, 90),
-			ScrollBarImageTransparency = 0.4,
+			ScrollBarThickness = 0,
 			BorderSizePixel = 0,
 			Parent = pageWrapper,
 		})
