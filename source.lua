@@ -1492,7 +1492,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			if other.PillIcon then
 				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
 			end
-			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.62 or 0.68})
+			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.5 or 0.58})
 		end
 		tween(settingsButtonIcon, TI_FAST, {ImageColor3 = settingsOpen and Theme.TextTitle or Theme.TextSub, Rotation = settingsOpen and 90 or 0})
 	end
@@ -3014,7 +3014,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
 			Parent = pill,
 		})
-		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.68, Parent = pill})
+		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.58, Thickness = 1.6, Parent = pill})
 		padAll(pill, 0, 22, 0, 22)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
