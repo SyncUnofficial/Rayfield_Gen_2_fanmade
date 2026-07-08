@@ -1042,7 +1042,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 	})
 	paint(window, "BackgroundColor3", "Background")
 	local windowCorner = round(window, 24)
-	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Parent = window})
+	-- the stroke stays a faint hairline while the window is open, then it is
+	-- brightened in the hidden state so the pill matches the active tab pill.
+	-- the gradient gives it the same top lit falloff as those pills
+	local windowStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Thickness = 1, Parent = window})
+	create("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(1, 0.75),
+		}),
+		Parent = windowStroke,
+	})
 	create("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new({
@@ -3238,6 +3249,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 		main.Visible = false
 		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, math.floor(PILL_H / 2))})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(PILL_W, PILL_H)})
+		-- adopt the active tab pill look: lighter fill, brighter hairline ring
+		tween(window, TI_MORPH, {BackgroundColor3 = Color3.fromRGB(46, 46, 46)})
+		tween(windowStroke, TI_MORPH, {Transparency = 0.45})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.55})
 		tween(root, TI_MORPH, {Position = UDim2.new(0.5, 0, 0, 16)})
 		task.wait(0.34)
@@ -3257,6 +3271,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 		pillButton.Visible = false
 		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 24)})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(WINDOW_W, minimized and HEADER_H or WINDOW_H)})
+		tween(window, TI_MORPH, {BackgroundColor3 = Theme.Background})
+		tween(windowStroke, TI_MORPH, {Transparency = 0.93})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.42})
 		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
 		task.wait(0.36)
