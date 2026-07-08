@@ -112,8 +112,8 @@ local Theme = {
 	Accent           = Color3.fromRGB(70, 168, 120),
 	AccentSoft       = Color3.fromRGB(104, 210, 156),
 	Knob             = Color3.fromRGB(255, 255, 255),
-	KnobOff          = Color3.fromRGB(70, 70, 70),
-	ToggleTrack      = Color3.fromRGB(16, 16, 16),
+	KnobOff          = Color3.fromRGB(66, 68, 70),
+	ToggleTrack      = Color3.fromRGB(18, 18, 18),
 	BadgeBackground  = Color3.fromRGB(240, 166, 63),
 	BadgeText        = Color3.fromRGB(66, 45, 15),
 	NotifyBackground = Color3.fromRGB(16, 16, 16),
@@ -1956,37 +1956,38 @@ function RayfieldLibrary:CreateWindow(Settings)
 			descFor(card, ToggleSettings.Description)
 			hoverable(card)
 
-			-- dark inset track with a large pill knob, per the Gen2 design
+			-- wide flat track with a neutral ring. the ring stays gray in
+			-- both states, all the green comes from the knob and its glow
 			local track = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -15, 0.5, 0),
-				Size = UDim2.fromOffset(52, 28),
+				Size = UDim2.fromOffset(58, 26),
 			})
 			paint(track, "BackgroundColor3", "ToggleTrack")
 			roundFull(track)
 			local trackStroke = create("UIStroke", {
 				Color = Color3.fromRGB(255, 255, 255),
-				Transparency = 0.86,
+				Transparency = 0.84,
 				Parent = track,
 			})
 			track.Parent = card
 
 			-- soft green halo that washes over the card corner when on
-			local trackGlow = softGlow(track, Theme.Accent, 1, 40)
+			local trackGlow = softGlow(track, Theme.Accent, 1, 46)
 
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 4, 0.5, 0),
-				Size = UDim2.fromOffset(26, 20),
+				Position = UDim2.new(0, 3, 0.5, 0),
+				Size = UDim2.fromOffset(28, 20),
 				BackgroundColor3 = Theme.KnobOff,
 			})
 			roundFull(knob)
 			create("UIGradient", {
 				Rotation = 90,
-				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
+				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(196, 196, 196)),
 				Parent = knob,
 			})
-			local knobGlow = softGlow(knob, Theme.Accent, 1, 22)
+			local knobGlow = softGlow(knob, Theme.Accent, 1, 26)
 			knob.Parent = track
 
 			local Toggle = {
@@ -1998,15 +1999,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local on = Toggle.CurrentValue
 				local info = animate and TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) or TweenInfo.new(0)
 				tween(knob, info, {
-					Position = on and UDim2.new(1, -30, 0.5, 0) or UDim2.new(0, 4, 0.5, 0),
+					Position = on and UDim2.new(1, -31, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
 					BackgroundColor3 = on and Theme.Accent or Theme.KnobOff,
 				})
-				tween(knobGlow, info, {ImageTransparency = on and 0.62 or 1})
-				tween(trackGlow, info, {ImageTransparency = on and 0.85 or 1})
-				tween(trackStroke, info, {
-					Color = on and Theme.AccentDark or Color3.fromRGB(255, 255, 255),
-					Transparency = on and 0.55 or 0.86,
-				})
+				tween(knobGlow, info, {ImageTransparency = on and 0.68 or 1})
+				tween(trackGlow, info, {ImageTransparency = on and 0.88 or 1})
+				tween(trackStroke, info, {Transparency = on and 0.78 or 0.84})
 			end
 			render(false)
 
@@ -2093,18 +2091,16 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local track
 			if compact then
 				track = create("Frame", {
-					Position = UDim2.fromOffset(15, 43),
-					Size = UDim2.new(1, -30, 0, 20),
-					BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-					BackgroundTransparency = 0.25,
+					Position = UDim2.fromOffset(15, 45),
+					Size = UDim2.new(1, -30, 0, 18),
+					BackgroundColor3 = Color3.fromRGB(56, 56, 56),
 				})
 			else
 				track = create("Frame", {
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, -17, 0.5, 0),
-					Size = UDim2.new(0.46, 0, 0, 20),
-					BackgroundColor3 = Color3.fromRGB(45, 45, 45),
-					BackgroundTransparency = 0.25,
+					Size = UDim2.new(0.46, 0, 0, 18),
+					BackgroundColor3 = Color3.fromRGB(56, 56, 56),
 				})
 			end
 			roundFull(track)
@@ -2123,17 +2119,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 				}),
 				Parent = fill,
 			})
-			softGlow(fill, Theme.Accent, 0.76, 20)
+			softGlow(fill, Theme.Accent, 0.7, 22)
 
 			local knob = create("Frame", {
-				AnchorPoint = Vector2.new(1, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0.5, 0, 0.5, 0),
-				Size = UDim2.fromOffset(36, 27),
+				Size = UDim2.fromOffset(40, 28),
 				ZIndex = 3,
 			})
 			paint(knob, "BackgroundColor3", "Knob")
 			roundFull(knob)
-			softGlow(knob, Color3.fromRGB(255, 255, 255), 0.62, 26, 2)
+			softGlow(knob, Color3.fromRGB(255, 255, 255), 0.55, 28, 2)
 			knob.Parent = track
 
 			local Slider = {
@@ -2155,15 +2151,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 				return text
 			end
 
-			-- knob rides the end of the fill, overhanging it slightly
+			-- the knob is centered on the end of the fill, so the bright
+			-- tip of the gradient tucks underneath it like the mockup.
+			-- the travel is inset so the knob never leaves the track
 			local function render(animate)
 				local alpha = 0
 				if range[2] ~= range[1] then
 					alpha = (Slider.CurrentValue - range[1]) / (range[2] - range[1])
 				end
 				alpha = math.clamp(alpha, 0, 1)
-				local minAlpha = 0.2
-				local shown = minAlpha + alpha * (1 - minAlpha)
+				local inset = 0.11
+				local shown = inset + alpha * (1 - 2 * inset)
 				local info = animate and TI_SMOOTH or TweenInfo.new(0)
 				tween(fill, info, {Size = UDim2.new(shown, 0, 1, 0)})
 				tween(knob, info, {Position = UDim2.new(shown, 0, 0.5, 0)})
@@ -2186,7 +2184,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(38, 29)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(42, 30)})
 					local alpha = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
 					setFromAlpha(math.clamp(alpha, 0, 1))
 				end
@@ -2194,7 +2192,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			track.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 27)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(40, 28)})
 				end
 			end)
 			connect(UserInputService.InputChanged, function(input)
@@ -2206,7 +2204,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			connect(UserInputService.InputEnded, function(input)
 				if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 					dragging = false
-					tween(knob, TI_FAST, {Size = UDim2.fromOffset(36, 27)})
+					tween(knob, TI_FAST, {Size = UDim2.fromOffset(40, 28)})
 				end
 			end)
 
