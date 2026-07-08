@@ -266,6 +266,130 @@ local ICON_ALIASES = {
 	["key-round"] = {"key"},
 }
 
+-- solid filled icons for the tab bar, Material Design baseline set
+-- (Apache 2.0), individual asset ids extracted from the public
+-- Material Icons plugin. lucide stays the source for everything else
+local FILLED_ICONS = {
+	home = 6026568195,
+	bar_chart = 6034898096,
+	equalizer = 6026647906,
+	grid_view = 6031302950,
+	settings = 6031280882,
+	tune = 6031734877,
+	search = 6031154871,
+	monetization_on = 6034973115,
+	chat = 6035173838,
+	chat_bubble = 6035181858,
+	forum = 6035202002,
+	vpn_key = 6035202034,
+	visibility = 6031075931,
+	mouse = 6034837797,
+	auto_awesome = 6031360365,
+	save = 6035067857,
+	play_arrow = 6026663699,
+	close = 6031094678,
+	remove = 6035067836,
+	fast_forward = 6026647902,
+	message = 6035202033,
+	speed = 6026681578,
+	dashboard = 6022668883,
+	widgets = 6035039429,
+	insert_chart = 6034925628,
+	layers = 6034687957,
+	apps = 6031090999,
+	bolt = 6035047381,
+	person = 6034287594,
+	group = 6034281901,
+	shield = 6035078889,
+	security = 6034837802,
+	gps_fixed = 6034989550,
+	my_location = 6034509987,
+	favorite = 6023426974,
+	star = 6031068423,
+	folder = 6031302932,
+	description = 6022668888,
+	code = 6022668955,
+	sports_esports = 6034227061,
+	videogame_asset = 6034848748,
+	notifications = 6034308946,
+	palette = 6034316009,
+	brush = 6031572320,
+	timer = 6031754564,
+	schedule = 6031260808,
+	attach_money = 6034898098,
+}
+
+-- lucide names to their closest Material filled equivalent
+local FILLED_ALIASES = {
+	["house"] = "home",
+	["home"] = "home",
+	["chart-no-axes-column"] = "bar_chart",
+	["chart-no-axes-column-increasing"] = "bar_chart",
+	["bar-chart-3"] = "bar_chart",
+	["bar-chart"] = "bar_chart",
+	["chart-column"] = "bar_chart",
+	["audio-lines"] = "equalizer",
+	["layout-grid"] = "grid_view",
+	["grid-2x2"] = "grid_view",
+	["grid-3x3"] = "apps",
+	["settings"] = "settings",
+	["settings-2"] = "tune",
+	["sliders-horizontal"] = "tune",
+	["search"] = "search",
+	["text-search"] = "search",
+	["coins"] = "monetization_on",
+	["badge-dollar-sign"] = "attach_money",
+	["dollar-sign"] = "attach_money",
+	["messages-square"] = "forum",
+	["message-square"] = "chat",
+	["message-circle"] = "chat_bubble",
+	["mail"] = "message",
+	["key"] = "vpn_key",
+	["key-round"] = "vpn_key",
+	["eye"] = "visibility",
+	["mouse"] = "mouse",
+	["mouse-pointer-2"] = "mouse",
+	["sparkles"] = "auto_awesome",
+	["save"] = "save",
+	["play"] = "play_arrow",
+	["x"] = "close",
+	["minus"] = "remove",
+	["fast-forward"] = "fast_forward",
+	["gauge"] = "speed",
+	["layout-panel-left"] = "dashboard",
+	["layout-dashboard"] = "dashboard",
+	["blocks"] = "widgets",
+	["layers"] = "layers",
+	["zap"] = "bolt",
+	["user"] = "person",
+	["user-round"] = "person",
+	["users"] = "group",
+	["users-round"] = "group",
+	["shield"] = "shield",
+	["shield-check"] = "security",
+	["crosshair"] = "my_location",
+	["locate-fixed"] = "gps_fixed",
+	["heart"] = "favorite",
+	["star"] = "star",
+	["folder"] = "folder",
+	["file-text"] = "description",
+	["code"] = "code",
+	["gamepad-2"] = "sports_esports",
+	["gamepad"] = "videogame_asset",
+	["bell"] = "notifications",
+	["palette"] = "palette",
+	["brush"] = "brush",
+	["paintbrush"] = "brush",
+	["timer"] = "timer",
+	["clock"] = "schedule",
+}
+
+local function getFilled(name)
+	name = string.lower(name)
+	local material = FILLED_ALIASES[name] or (FILLED_ICONS[name] and name)
+	return material and FILLED_ICONS[material] or nil
+end
+
 local warnedIcons = {}
 
 local function getLucide(name)
@@ -389,7 +513,7 @@ end
 
 -- makes an ImageLabel for an icon which may be a lucide name, an asset id
 -- number, or a full rbxassetid string
-local function makeIcon(parent, icon, size, color3, transparency)
+local function makeIcon(parent, icon, size, color3, transparency, filled)
 	if icon == nil or icon == 0 or icon == "" then return nil end
 	local img = create("ImageLabel", {
 		BackgroundTransparency = 1,
@@ -404,7 +528,12 @@ local function makeIcon(parent, icon, size, color3, transparency)
 		if string.find(icon, "rbxasset") or string.find(icon, "://") then
 			img.Image = icon
 		else
-			applyLucide(img, icon)
+			local filledId = filled and getFilled(icon)
+			if filledId then
+				img.Image = "rbxassetid://" .. tostring(filledId)
+			else
+				applyLucide(img, icon)
+			end
 		end
 	end
 	return img
@@ -1287,7 +1416,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = main,
 	})
 
-	local TABBAR_H = 44
+	local TABBAR_H = 48
 	local tabBar = create("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, TABBAR_H),
@@ -1487,12 +1616,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local function styleTabPills()
 		for _, other in ipairs(tabs) do
 			local active = (not settingsOpen) and other == currentTab
-			tween(other.Pill, TI_FAST, {BackgroundColor3 = active and Theme.CardHover or Theme.CardInset, BackgroundTransparency = active and 0 or 0.45})
+			tween(other.Pill, TI_FAST, {BackgroundColor3 = active and Color3.fromRGB(46, 46, 46) or Theme.CardInset, BackgroundTransparency = active and 0 or 0.45})
 			tween(other.PillLabel, TI_FAST, {TextColor3 = active and Theme.TextTitle or Theme.TextSub})
 			if other.PillIcon then
 				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
 			end
-			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.66 or 0.78})
+			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.72 or 0.78})
 		end
 		tween(settingsButtonIcon, TI_FAST, {ImageColor3 = settingsOpen and Theme.TextTitle or Theme.TextSub, Rotation = settingsOpen and 90 or 0})
 	end
@@ -3003,7 +3132,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 		local pill = create("TextButton", {
 			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.new(0, 0, 0, 42),
+			Size = UDim2.new(0, 0, 0, 44),
 			Text = "",
 			BackgroundTransparency = 0.45,
 			LayoutOrder = #tabs + 1,
@@ -3011,9 +3140,14 @@ function RayfieldLibrary:CreateWindow(Settings)
 		})
 		pill.BackgroundColor3 = Theme.CardInset
 		roundFull(pill)
-		-- the ring is what defines the pill, visible in both states
+		-- soft top light on the fill, the ring defines the shape in both states
+		create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
+			Parent = pill,
+		})
 		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.78, Parent = pill})
-		padAll(pill, 0, 20, 0, 20)
+		padAll(pill, 0, 22, 0, 22)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -3023,7 +3157,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		})
 		local pillIcon = nil
 		if tabImage and tabImage ~= 0 and tabImage ~= "" then
-			pillIcon = makeIcon(pill, tabImage, 18, Theme.TextSub)
+			pillIcon = makeIcon(pill, tabImage, 18, Theme.TextSub, nil, true)
 			if pillIcon then pillIcon.LayoutOrder = 1 end
 		end
 		local pillLabel = create("TextLabel", {
