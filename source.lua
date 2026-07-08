@@ -1498,7 +1498,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			if other.PillIcon then
 				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
 			end
-			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.38 or 0.45})
+			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.55 or 0.68})
 		end
 		tween(settingsButtonIcon, TI_FAST, {ImageColor3 = settingsOpen and Theme.TextTitle or Theme.TextSub, Rotation = settingsOpen and 90 or 0})
 	end
@@ -3020,7 +3020,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
 			Parent = pill,
 		})
-		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.45, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = pill})
+		-- hairline rim light: 1px, brighter along the top edge, fading out
+		-- toward the bottom, like the reference
+		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.62, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = pill})
+		create("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(1, 0.75),
+			}),
+			Parent = pillStroke,
+		})
 		padAll(pill, 0, 22, 0, 22)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
