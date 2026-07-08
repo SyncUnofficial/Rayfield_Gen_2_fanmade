@@ -1972,8 +1972,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			track.Parent = card
 
-			-- soft green halo that washes over the card corner when on
-			local trackGlow = softGlow(track, Theme.Accent, 1, 46)
+			-- tight halo hugging the pill, not a wash over the card
+			local trackGlow = softGlow(track, Theme.Accent, 1, 16)
 
 			local knob = create("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -1987,7 +1987,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(196, 196, 196)),
 				Parent = knob,
 			})
-			local knobGlow = softGlow(knob, Theme.Accent, 1, 26)
+			local knobGlow = softGlow(knob, Theme.Accent, 1, 12)
 			knob.Parent = track
 
 			local Toggle = {
@@ -2002,9 +2002,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 					Position = on and UDim2.new(1, -31, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
 					BackgroundColor3 = on and Theme.Accent or Theme.KnobOff,
 				})
-				tween(knobGlow, info, {ImageTransparency = on and 0.68 or 1})
-				tween(trackGlow, info, {ImageTransparency = on and 0.88 or 1})
-				tween(trackStroke, info, {Transparency = on and 0.78 or 0.84})
+				tween(knobGlow, info, {ImageTransparency = on and 0.8 or 1})
+				tween(trackGlow, info, {ImageTransparency = on and 0.86 or 1})
+				tween(trackStroke, info, {
+					Color = on and Theme.AccentSoft or Color3.fromRGB(255, 255, 255),
+					Transparency = on and 0.72 or 0.84,
+				})
 			end
 			render(false)
 
