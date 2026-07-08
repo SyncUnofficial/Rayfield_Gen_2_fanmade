@@ -973,7 +973,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end)
 
-	local WINDOW_W, WINDOW_H = 470, 550
+	local WINDOW_W, WINDOW_H = 500, 550
 	local HEADER_H = 76
 	local PILL_H = 62
 
@@ -1022,7 +1022,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = root,
 	})
 	paint(window, "BackgroundColor3", "Background")
-	local windowCorner = round(window, 20)
+	-- corner kept close to original Rayfield, not the big 20px rounding
+	local windowCorner = round(window, 10)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Parent = window})
 	create("UIGradient", {
 		Rotation = 90,
@@ -3218,7 +3219,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		task.wait(0.14)
 		pillContent.Visible = false
 		pillButton.Visible = false
-		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 20)})
+		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, 10)})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(WINDOW_W, minimized and HEADER_H or WINDOW_H)})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.42})
 		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
