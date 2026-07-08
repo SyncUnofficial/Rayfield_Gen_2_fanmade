@@ -1305,6 +1305,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Padding = UDim.new(0, 8),
 		Parent = tabBar,
 	})
+	-- keep the pill strokes clear of the scrolling frame's clip edge
+	create("UIPadding", {
+		PaddingLeft = UDim.new(0, 2),
+		PaddingRight = UDim.new(0, 2),
+		Parent = tabBar,
+	})
 
 	-- search row between the tab bar and the pages
 	local searchHolder = create("Frame", {
@@ -1492,7 +1498,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			if other.PillIcon then
 				tween(other.PillIcon, TI_FAST, {ImageColor3 = active and Theme.TextTitle or Theme.TextSub})
 			end
-			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.5 or 0.58})
+			tween(other.PillStroke, TI_FAST, {Transparency = active and 0.38 or 0.45})
 		end
 		tween(settingsButtonIcon, TI_FAST, {ImageColor3 = settingsOpen and Theme.TextTitle or Theme.TextSub, Rotation = settingsOpen and 90 or 0})
 	end
@@ -3014,7 +3020,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
 			Parent = pill,
 		})
-		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.58, Thickness = 1.6, Parent = pill})
+		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.45, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = pill})
 		padAll(pill, 0, 22, 0, 22)
 		create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
