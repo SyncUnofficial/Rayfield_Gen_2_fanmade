@@ -3098,16 +3098,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		}
 		table.insert(tabs, tabEntry)
 
-		pill.MouseEnter:Connect(function()
-			if currentTab ~= tabEntry or settingsOpen then
-				tween(pill, TI_FAST, {BackgroundTransparency = 0.2})
-			end
-		end)
-		pill.MouseLeave:Connect(function()
-			if currentTab ~= tabEntry or settingsOpen then
-				tween(pill, TI_FAST, {BackgroundTransparency = 0.35})
-			end
-		end)
 		pill.MouseButton1Click:Connect(function()
 			selectTab(tabEntry)
 		end)
@@ -3287,14 +3277,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	end)
 	pillButton.MouseButton1Click:Connect(function()
 		task.spawn(showWindow)
-	end)
-	pillButton.MouseEnter:Connect(function()
-		if hidden and not morphing then
-			tween(window, TI_FAST, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
-		end
-	end)
-	pillButton.MouseLeave:Connect(function()
-		tween(window, TI_FAST, {BackgroundColor3 = Theme.Background})
 	end)
 
 	connect(UserInputService.InputBegan, function(input, processed)
