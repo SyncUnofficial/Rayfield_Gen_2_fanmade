@@ -240,6 +240,17 @@ local function measureText(text, size, font)
 	return Vector2.new(#text * size * 0.5, size)
 end
 
+-- wrapped height for a fixed column width. used where AutomaticSize is unreliable,
+-- e.g. text inside a CanvasGroup, so heights are computed up front instead
+local function measureWrapped(text, size, font, width)
+	local ok, result = pcall(function()
+		return TextService:GetTextSize(text, size, font, Vector2.new(width, 100000))
+	end)
+	if ok then return math.ceil(result.Y) end
+	local perLine = math.max(1, math.floor(width / (size * 0.55)))
+	return math.ceil(#text / perLine) * (size + 3)
+end
+
 -- icons
 -- lucide icons through the same generated index original Rayfield uses.
 -- the index is an older lucide set, so newer names are mapped back through
@@ -517,24 +528,39 @@ function RayfieldLibrary:Notify(data)
 		Position = UDim2.fromOffset(370, 0),
 	})
 	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 38, 0)
+
+	-- CanvasGroups defer text layout, so AutomaticSize on wrapped labels reads a
+	-- stale TextBounds and clips the content. Measure the wrapped heights up front
+	-- and size the card, column and labels explicitly so long text always fits.
+	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
+	local NOTIFY_W, PAD_X, PAD_Y, ICON_BOX, TEXT_GAP = 330, 20, 18, 40, 58
+	local textX = hasIcon and TEXT_GAP or 0
+	local textWidth = NOTIFY_W - PAD_X * 2 - textX
+
+	local titleText = data.Title or "Notification"
+	local bodyText = data.Content or ""
+	local titleH = measureWrapped(titleText, 17, FONT_BOLD, textWidth)
+	local bodyH = bodyText ~= "" and measureWrapped(bodyText, 15, FONT_MEDIUM, textWidth) or 0
+	local textColH = titleH + (bodyH > 0 and (4 + bodyH) or 0)
+	local contentH = math.max(hasIcon and ICON_BOX or 0, textColH)
+	local cardHeight = PAD_Y * 2 + contentH
+
 	local card = create("CanvasGroup", {
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Size = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(1, 0, 0, cardHeight),
 		GroupTransparency = 1,
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
 	-- flat matte black card, generous rounding, no top sheen (matches the target mock)
 	round(card, 22)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.94, Parent = card})
-	padAll(card, 18, 20, 18, 20)
+	padAll(card, PAD_Y, PAD_X, PAD_Y, PAD_X)
 
-	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
 	if hasIcon then
 		local iconHolder = create("Frame", {
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 0, 0.5, 0),
-			Size = UDim2.fromOffset(40, 40),
+			Size = UDim2.fromOffset(ICON_BOX, ICON_BOX),
 			Parent = card,
 		})
 		local icon = makeIcon(iconHolder, data.Image, 30, Theme.TextTitle)
@@ -544,11 +570,12 @@ function RayfieldLibrary:Notify(data)
 		end
 	end
 
+	-- text column, vertically centred so it lines up with the centred icon
 	local textCol = create("Frame", {
 		BackgroundTransparency = 1,
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Position = UDim2.fromOffset(hasIcon and 58 or 0, 0),
-		Size = UDim2.new(1, hasIcon and -58 or 0, 0, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, textX, 0.5, 0),
+		Size = UDim2.new(1, -textX, 0, textColH),
 		Parent = card,
 	})
 	create("UIListLayout", {
@@ -559,30 +586,32 @@ function RayfieldLibrary:Notify(data)
 	})
 	create("TextLabel", {
 		BackgroundTransparency = 1,
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Size = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(1, 0, 0, titleH),
 		Font = FONT_BOLD,
 		TextSize = 17,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = data.Title or "Notification",
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Text = titleText,
 		TextColor3 = Theme.TextTitle,
 		LayoutOrder = 1,
 		Parent = textCol,
 	})
-	create("TextLabel", {
-		BackgroundTransparency = 1,
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Size = UDim2.new(1, 0, 0, 0),
-		Font = FONT_MEDIUM,
-		TextSize = 15,
-		TextWrapped = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = data.Content or "",
-		TextColor3 = Theme.TextSub,
-		LayoutOrder = 2,
-		Parent = textCol,
-	})
+	if bodyH > 0 then
+		create("TextLabel", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, bodyH),
+			Font = FONT_MEDIUM,
+			TextSize = 15,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			Text = bodyText,
+			TextColor3 = Theme.TextSub,
+			LayoutOrder = 2,
+			Parent = textCol,
+		})
+	end
 
 	local clicker = create("TextButton", {
 		BackgroundTransparency = 1,
@@ -620,8 +649,7 @@ function RayfieldLibrary:Notify(data)
 	end)
 
 	task.defer(function()
-		task.wait()
-		local height = card.AbsoluteSize.Y
+		local height = cardHeight
 		-- open the slot smoothly so the cards above slide up to make room, in
 		-- step with the new card sliding in from the right and fading in
 		wrapper.Size = UDim2.new(1, 0, 0, 0)
