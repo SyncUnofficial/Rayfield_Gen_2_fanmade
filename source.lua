@@ -1549,15 +1549,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Visible = false,
 			Parent = pagesHolder,
 		})
-		-- fade the content into the window at the top and bottom scroll edges
-		create("UIGradient", {
+		-- fades the content into the window at whichever edge has content past it
+		local fadeGrad = create("UIGradient", {
 			Rotation = 90,
-			Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.06, 0),
-				NumberSequenceKeypoint.new(0.94, 0),
-				NumberSequenceKeypoint.new(1, 1),
-			}),
 			Parent = pageWrapper,
 		})
 		local page = create("ScrollingFrame", {
@@ -1577,6 +1571,32 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Parent = page,
 		})
 		padAll(page, 2, 5, 16, 1)
+
+		-- only fade an edge when there is actually content scrolled past it, so a
+		-- resting element never dissolves; ramp over the first 24px of overflow
+		local EDGE = 0.05
+		local function updateFade()
+			local vh = page.AbsoluteWindowSize.Y
+			if vh <= 0 then return end
+			local pos = page.CanvasPosition.Y
+			local maxScroll = math.max(0, page.AbsoluteCanvasSize.Y - vh)
+			local topT = math.clamp(pos / 24, 0, 1)
+			local botT = math.clamp((maxScroll - pos) / 24, 0, 1)
+			if topT <= 0.001 and botT <= 0.001 then
+				fadeGrad.Transparency = NumberSequence.new(0)
+			else
+				fadeGrad.Transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, topT),
+					NumberSequenceKeypoint.new(EDGE, 0),
+					NumberSequenceKeypoint.new(1 - EDGE, 0),
+					NumberSequenceKeypoint.new(1, botT),
+				})
+			end
+		end
+		page:GetPropertyChangedSignal("CanvasPosition"):Connect(updateFade)
+		page:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(updateFade)
+		page:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateFade)
+		task.defer(updateFade)
 		return page, pageWrapper
 	end
 
