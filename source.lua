@@ -2230,13 +2230,47 @@ function RayfieldLibrary:CreateWindow(Settings)
 					if fresh then
 						d = create("Frame", {
 							AnchorPoint = Vector2.new(0.5, 0.5),
-							Size = UDim2.fromOffset(9, 9),
+							BackgroundTransparency = 1,
+							Size = UDim2.fromOffset(10, 10),
 							ZIndex = 4,
 							Parent = dotHolder,
 						})
-						paint(d, "BackgroundColor3", "Knob")
-						roundFull(d)
-						glows[i] = softGlow(d, Theme.AccentSoft, 1, 26, 4)
+						local haloB = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.fromScale(0.5, 0.5),
+							Size = UDim2.fromOffset(0, 0),
+							BackgroundTransparency = 1,
+							ZIndex = 3,
+							Parent = d,
+						})
+						paint(haloB, "BackgroundColor3", "Accent")
+						roundFull(haloB)
+						local haloA = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.fromScale(0.5, 0.5),
+							Size = UDim2.fromOffset(0, 0),
+							BackgroundTransparency = 1,
+							ZIndex = 4,
+							Parent = d,
+						})
+						paint(haloA, "BackgroundColor3", "AccentSoft")
+						roundFull(haloA)
+						local core = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.fromScale(0.5, 0.5),
+							Size = UDim2.fromOffset(10, 10),
+							ZIndex = 5,
+							Parent = d,
+						})
+						paint(core, "BackgroundColor3", "Knob")
+						roundFull(core)
+						create("UIStroke", {
+							Color = Theme.Card,
+							Thickness = 2,
+							Transparency = 0.35,
+							Parent = core,
+						})
+						glows[i] = {core = core, a = haloA, b = haloB}
 						dots[i] = d
 					end
 					local target = UDim2.fromOffset(xsCache[i], ysCache[i])
@@ -2292,13 +2326,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 							f = create("Frame", {
 								AnchorPoint = Vector2.new(0, 1),
 								BorderSizePixel = 0,
-								BackgroundTransparency = 0.16,
+								BackgroundTransparency = 0.12,
 								Parent = fillHolder,
 							})
 							paint(f, "BackgroundColor3", "AccentDark")
 							create("UIGradient", {
 								Rotation = 90,
-								Transparency = NumberSequence.new(0, 0.62),
+								Transparency = NumberSequence.new(0, 0.78),
 								Parent = f,
 							})
 							cols[c] = f
@@ -2324,16 +2358,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			local function applyHover(i)
 				if hoverIdx == i then return end
-				local old = hoverIdx and dots[hoverIdx]
-				if old then
-					tween(old, TI_FAST, {Size = UDim2.fromOffset(9, 9), BackgroundColor3 = Theme.Knob})
-					if glows[hoverIdx] then tween(glows[hoverIdx], TI_FAST, {ImageTransparency = 1}) end
+				if hoverIdx and glows[hoverIdx] then
+					local g = glows[hoverIdx]
+					tween(g.core, TI_FAST, {Size = UDim2.fromOffset(10, 10), BackgroundColor3 = Theme.Knob})
+					tween(g.a, TI_MED, {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1})
+					tween(g.b, TI_MED, {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1})
 				end
 				hoverIdx = i
-				local d = i and dots[i]
-				if d then
-					tween(d, TI_FAST, {Size = UDim2.fromOffset(15, 15), BackgroundColor3 = Theme.Accent})
-					if glows[i] then tween(glows[i], TI_FAST, {ImageTransparency = 0.45}) end
+				local g = i and glows[i]
+				if g then
+					tween(g.core, TI_FAST, {Size = UDim2.fromOffset(16, 16), BackgroundColor3 = Theme.Accent})
+					tween(g.a, TI_MED, {Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 0.68})
+					tween(g.b, TI_MED, {Size = UDim2.fromOffset(52, 52), BackgroundTransparency = 0.88})
 					hairline.Position = UDim2.fromOffset(xsCache[i], 0)
 					hairline.Visible = true
 					setValue(fmt(points[i]))
@@ -2360,10 +2396,58 @@ function RayfieldLibrary:CreateWindow(Settings)
 				applyHover(nil)
 			end)
 
+			local played = false
+			local function entrance()
+				if played or #dots == 0 then return end
+				played = true
+				for i, g in ipairs(glows) do
+					g.core.Size = UDim2.fromOffset(0, 0)
+					task.delay(0.05 + i * 0.045, function()
+						tween(g.core, TI_MED, {Size = UDim2.fromOffset(10, 10)})
+					end)
+				end
+				for i, s in ipairs(segs) do
+					s.BackgroundTransparency = 1
+					task.delay(0.1 + i * 0.045, function()
+						tween(s, TI_MED, {BackgroundTransparency = 0})
+					end)
+				end
+				for c, f in ipairs(cols) do
+					local target = f.Size
+					f.Size = UDim2.fromOffset(target.X.Offset, 0)
+					task.delay(0.05 + c * 0.005, function()
+						tween(f, TI_SMOOTH, {Size = target})
+					end)
+				end
+			end
+			local function armEntrance()
+				if played then return end
+				local blocker
+				local a = card
+				while a and not a:IsA("ScreenGui") do
+					if a:IsA("GuiObject") and not a.Visible then blocker = a end
+					a = a.Parent
+				end
+				if blocker then
+					local conn
+					conn = blocker:GetPropertyChangedSignal("Visible"):Connect(function()
+						if blocker.Visible then
+							conn:Disconnect()
+							task.defer(armEntrance)
+						end
+					end)
+				else
+					entrance()
+				end
+			end
+
 			plot:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 				redraw(false)
 			end)
-			task.defer(function() redraw(false) end)
+			task.defer(function()
+				redraw(false)
+				armEntrance()
+			end)
 
 			local Chart = {}
 			function Chart:Set(newSettings)
