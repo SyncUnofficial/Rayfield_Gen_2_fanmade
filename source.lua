@@ -2331,12 +2331,14 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local function applyHover(i)
 				if hoverIdx == i then return end
 				if hoverIdx and dots[hoverIdx] then
-					tween(dots[hoverIdx], TI_MED, {Size = UDim2.fromOffset(10, 10), BackgroundColor3 = Theme.Knob})
+					dots[hoverIdx].Size = UDim2.fromOffset(10, 10)
+					dots[hoverIdx].BackgroundColor3 = Theme.Knob
 				end
 				hoverIdx = i
 				local d = i and dots[i]
 				if d then
-					tween(d, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(19, 19), BackgroundColor3 = Theme.AccentSoft})
+					d.Size = UDim2.fromOffset(14, 14)
+					d.BackgroundColor3 = Theme.AccentSoft
 					hairline.Position = UDim2.fromOffset(xsCache[i], 0)
 					hairline.Visible = true
 					setValue(fmt(points[i]))
