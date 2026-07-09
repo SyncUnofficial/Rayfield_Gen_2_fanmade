@@ -1114,37 +1114,22 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = window,
 	})
 	do
-		local well = create("Frame", {
-			BackgroundColor3 = Theme.Card,
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 9, 0.5, 0),
-			Size = UDim2.fromOffset(44, 44),
-			Parent = pillContent,
-		})
-		roundFull(well)
-		create("UIGradient", {
-			Rotation = 90,
-			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 190, 190)),
-			Parent = well,
-		})
-		local placedIcon = nil
-		if Settings.Icon and Settings.Icon ~= 0 and Settings.Icon ~= "" then
-			placedIcon = makeIcon(well, Settings.Icon, 24, Theme.TextTitle)
-		end
+		-- just the icon on the pill, no circular well behind it
+		local placedIcon = makeIcon(pillContent, "eye", 30, Theme.TextTitle)
 		if placedIcon then
 			placedIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-			placedIcon.Position = UDim2.fromScale(0.5, 0.5)
+			placedIcon.Position = UDim2.new(0, 31, 0.5, 0)
 		else
 			create("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
+				Position = UDim2.new(0, 31, 0.5, 0),
 				Size = UDim2.fromOffset(30, 30),
 				Font = FONT_BOLD,
 				TextSize = 20,
 				Text = string.upper(string.sub(pillNameText, 1, 1)),
 				TextColor3 = Theme.TextTitle,
-				Parent = well,
+				Parent = pillContent,
 			})
 		end
 
