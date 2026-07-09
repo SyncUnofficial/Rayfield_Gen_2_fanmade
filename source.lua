@@ -487,16 +487,16 @@ local function ensureRoot()
 		Name = "Notifications",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -24, 1, -24),
-		Size = UDim2.fromOffset(320, 900),
+		Position = UDim2.new(1, -20, 1, -20),
+		Size = UDim2.fromOffset(300, 900),
 		Parent = rootGui,
 	})
 	create("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
-		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 14),
+		Padding = UDim.new(0, 8),
 		Parent = notifyStack,
 	})
 	return rootGui
@@ -511,106 +511,74 @@ function RayfieldLibrary:Notify(data)
 	ensureRoot()
 	notifyOrder = notifyOrder + 1
 
-	local wrapper = create("Frame", {
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		Size = UDim2.new(1, 0, 0, 0),
-		LayoutOrder = notifyOrder,
-		Parent = notifyStack,
-	})
-
-	-- the holder slides, carrying the drop shadow and the card. the card is
-	-- a CanvasGroup so it fades as one piece; the shadow would be clipped
-	-- inside it, so it lives on the holder instead and fades separately
-	local holder = create("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		Position = UDim2.fromOffset(370, 0),
-	})
-	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 22, 0)
-
-	-- CanvasGroups defer text layout, so AutomaticSize on wrapped labels reads a
-	-- stale TextBounds and clips the content. Measure the wrapped heights up front
-	-- and size the card, column and labels explicitly so long text always fits.
+	-- Rayfield Gen 1 style: 300 wide, icon 32 at x=20, text at x=70, the card
+	-- grows in height from collapsed while fading in (the fade masks the reveal)
 	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
-	-- compact card: tighter padding, smaller icon and text
-	local NOTIFY_W, PAD_X, PAD_Y, ICON_BOX, TEXT_GAP = 320, 15, 13, 32, 46
-	local textX = hasIcon and TEXT_GAP or 0
-	local textWidth = NOTIFY_W - PAD_X * 2 - textX
+	local NOTIFY_W, ICON_BOX = 300, 32
+	local textX = hasIcon and 70 or 18
+	local textWidth = NOTIFY_W - textX - 14
 
 	local titleText = data.Title or "Notification"
 	local bodyText = data.Content or ""
-	local titleH = measureWrapped(titleText, 15, FONT_BOLD, textWidth)
-	local bodyH = bodyText ~= "" and measureWrapped(bodyText, 14, FONT_MEDIUM, textWidth) or 0
-	local textColH = titleH + (bodyH > 0 and (3 + bodyH) or 0)
-	local contentH = math.max(hasIcon and ICON_BOX or 0, textColH)
-	local cardHeight = PAD_Y * 2 + contentH
+	local titleH = measureWrapped(titleText, 16, FONT_BOLD, textWidth)
+	local bodyH = bodyText ~= "" and measureWrapped(bodyText, 15, FONT_MEDIUM, textWidth) or 0
+	-- height like Gen 1: title + body plus fixed top/bottom padding, minimum 60
+	local fullH = math.max(15 + titleH + (bodyH > 0 and (2 + bodyH) or 0) + 14, 60)
 
+	-- holder carries the drop shadow and drives the list reflow as it grows
+	local holder = create("Frame", {
+		Name = titleText,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -60, 0, 0),
+		LayoutOrder = notifyOrder,
+		Parent = notifyStack,
+	})
+	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 18, 0)
+
+	-- flat matte black card, grows and fades as one piece
 	local card = create("CanvasGroup", {
-		Size = UDim2.new(1, 0, 0, cardHeight),
+		Size = UDim2.fromScale(1, 1),
 		GroupTransparency = 1,
 		BackgroundColor3 = Theme.NotifyBackground,
+		Parent = holder,
 	})
-	-- flat matte black card, no top sheen (matches the target mock)
-	round(card, 18)
+	round(card, 20)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.94, Parent = card})
-	padAll(card, PAD_Y, PAD_X, PAD_Y, PAD_X)
 
 	if hasIcon then
-		local iconHolder = create("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 0, 0.5, 0),
-			Size = UDim2.fromOffset(ICON_BOX, ICON_BOX),
-			Parent = card,
-		})
-		local icon = makeIcon(iconHolder, data.Image, 24, Theme.TextTitle)
+		local icon = makeIcon(card, data.Image, ICON_BOX, Theme.TextTitle)
 		if icon then
-			icon.AnchorPoint = Vector2.new(0.5, 0.5)
-			icon.Position = UDim2.fromScale(0.5, 0.5)
+			icon.AnchorPoint = Vector2.new(0, 0.5)
+			icon.Position = UDim2.new(0, 20, 0.5, 0)
 		end
 	end
 
-	-- text column, vertically centred so it lines up with the centred icon
-	local textCol = create("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, textX, 0.5, 0),
-		Size = UDim2.new(1, -textX, 0, textColH),
-		Parent = card,
-	})
-	create("UIListLayout", {
-		FillDirection = Enum.FillDirection.Vertical,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 3),
-		Parent = textCol,
-	})
 	create("TextLabel", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, titleH),
+		Position = UDim2.fromOffset(textX, 15),
+		Size = UDim2.new(0, textWidth, 0, titleH),
 		Font = FONT_BOLD,
-		TextSize = 15,
+		TextSize = 16,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Text = titleText,
 		TextColor3 = Theme.TextTitle,
-		LayoutOrder = 1,
-		Parent = textCol,
+		Parent = card,
 	})
 	if bodyH > 0 then
 		create("TextLabel", {
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, bodyH),
+			Position = UDim2.fromOffset(textX, 15 + titleH + 2),
+			Size = UDim2.new(0, textWidth, 0, bodyH),
 			Font = FONT_MEDIUM,
-			TextSize = 14,
+			TextSize = 15,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			Text = bodyText,
 			TextColor3 = Theme.TextSub,
-			LayoutOrder = 2,
-			Parent = textCol,
+			Parent = card,
 		})
 	end
 
@@ -622,27 +590,24 @@ function RayfieldLibrary:Notify(data)
 		Parent = card,
 	})
 
-	card.Parent = holder
-	holder.Parent = wrapper
-
 	local paused = false
 	local dismissed = false
 	clicker.MouseEnter:Connect(function() paused = true end)
 	clicker.MouseLeave:Connect(function() paused = false end)
 
+	local GROW = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	local FADE = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
 	local function dismiss()
 		if dismissed then return end
 		dismissed = true
-		-- slide back out through the right edge while fading, then let the
-		-- stack settle down into the freed space
-		tween(holder, TI_SMOOTH, {Position = UDim2.fromOffset(390, 0)})
-		tween(card, TI_SMOOTH, {GroupTransparency = 1})
-		tween(glow, TI_SMOOTH, {ImageTransparency = 1})
-		task.wait(0.22)
-		wrapper.ClipsDescendants = true
-		tween(wrapper, TI_MED, {Size = UDim2.new(1, 0, 0, 0)})
-		task.wait(0.28)
-		wrapper:Destroy()
+		-- fade out, then collapse the slot so the stack settles up into the gap
+		tween(card, FADE, {GroupTransparency = 1})
+		tween(glow, FADE, {ImageTransparency = 1})
+		task.wait(0.2)
+		tween(holder, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Size = UDim2.new(1, -90, 0, 0)})
+		task.wait(0.55)
+		holder:Destroy()
 	end
 
 	clicker.MouseButton1Click:Connect(function()
@@ -650,21 +615,16 @@ function RayfieldLibrary:Notify(data)
 	end)
 
 	task.defer(function()
-		-- open the slot at full height right away so the card slides in fully
-		-- formed from the right instead of being revealed (and clipped) top down
-		wrapper.Size = UDim2.new(1, 0, 0, cardHeight)
-		holder.Position = UDim2.fromOffset(370, 0)
-		tween(holder, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
-		tween(card, TI_MORPH, {GroupTransparency = 0})
-		tween(glow, TI_MORPH, {ImageTransparency = 0.6})
-		-- unclip once in place so the soft shadow can bleed past the card
-		task.delay(0.3, function()
-			if not dismissed and wrapper.Parent then
-				wrapper.ClipsDescendants = false
-			end
-		end)
+		-- grow the slot from collapsed to full height and widen from -60 to 0,
+		-- then fade the card in so it never looks hard cut (Rayfield Gen 1)
+		tween(holder, GROW, {Size = UDim2.new(1, 0, 0, fullH)})
+		task.wait(0.15)
+		tween(card, FADE, {GroupTransparency = 0})
+		task.wait(0.05)
+		tween(glow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.72})
 
-		local duration = data.Duration or 5
+		-- Gen 1 auto duration scales with content length when none is given
+		local duration = data.Duration or math.min(math.max(#bodyText * 0.1 + 2.5, 3), 10)
 		local elapsed = 0
 		while elapsed < duration and not dismissed do
 			local dt = task.wait(0.1)
