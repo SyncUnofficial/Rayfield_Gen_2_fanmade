@@ -1805,9 +1805,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 				create("UIGradient", {
 					Rotation = 112,
 					Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Theme.AccentSoft),
-						ColorSequenceKeypoint.new(0.55, Theme.Accent),
-						ColorSequenceKeypoint.new(1, Theme.AccentDark),
+						ColorSequenceKeypoint.new(0, Color3.fromRGB(84, 140, 114)),
+						ColorSequenceKeypoint.new(0.55, Color3.fromRGB(42, 86, 69)),
+						ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 44, 36)),
 					}),
 					Parent = card,
 				})
@@ -1870,9 +1870,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 			create("UIGradient", {
 				Rotation = 112,
 				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Theme.AccentSoft),
-					ColorSequenceKeypoint.new(0.45, Theme.Accent),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 42, 33)),
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(84, 140, 114)),
+					ColorSequenceKeypoint.new(0.5, Color3.fromRGB(42, 86, 69)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 44, 36)),
 				}),
 				Parent = card,
 			})
