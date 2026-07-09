@@ -2184,7 +2184,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = plot,
 			})
 
-			local dots, segs, cols, glows = {}, {}, {}, {}
+			local dots, segs, cols = {}, {}, {}
 			local xsCache, ysCache = {}, {}
 			local hoverIdx = nil
 
@@ -2217,7 +2217,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 				for i = #dots, n + 1, -1 do
 					dots[i]:Destroy()
 					dots[i] = nil
-					glows[i] = nil
 				end
 				for i = #segs, n, -1 do
 					segs[i]:Destroy()
@@ -2230,52 +2229,25 @@ function RayfieldLibrary:CreateWindow(Settings)
 					if fresh then
 						d = create("Frame", {
 							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundTransparency = 1,
 							Size = UDim2.fromOffset(10, 10),
 							ZIndex = 4,
 							Parent = dotHolder,
 						})
-						local haloB = create("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							Position = UDim2.fromScale(0.5, 0.5),
-							Size = UDim2.fromOffset(0, 0),
-							BackgroundTransparency = 1,
-							ZIndex = 3,
-							Parent = d,
-						})
-						paint(haloB, "BackgroundColor3", "Accent")
-						roundFull(haloB)
-						local haloA = create("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							Position = UDim2.fromScale(0.5, 0.5),
-							Size = UDim2.fromOffset(0, 0),
-							BackgroundTransparency = 1,
-							ZIndex = 4,
-							Parent = d,
-						})
-						paint(haloA, "BackgroundColor3", "AccentSoft")
-						roundFull(haloA)
-						local core = create("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							Position = UDim2.fromScale(0.5, 0.5),
-							Size = UDim2.fromOffset(10, 10),
-							ZIndex = 5,
-							Parent = d,
-						})
-						paint(core, "BackgroundColor3", "Knob")
-						roundFull(core)
-						create("UIStroke", {
-							Color = Theme.Card,
-							Thickness = 2,
-							Transparency = 0.35,
-							Parent = core,
-						})
-						glows[i] = {core = core, a = haloA, b = haloB}
+						paint(d, "BackgroundColor3", "Knob")
+						roundFull(d)
 						dots[i] = d
 					end
 					local target = UDim2.fromOffset(xsCache[i], ysCache[i])
-					if animate and not fresh then
-						tween(d, TI_MED, {Position = target})
+					if fresh then
+						d.Position = target
+						if animate then
+							d.Size = UDim2.fromOffset(0, 0)
+							task.delay(0.12, function()
+								tween(d, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(10, 10)})
+							end)
+						end
+					elseif animate then
+						tween(d, TI_MORPH, {Position = target})
 					else
 						d.Position = target
 					end
@@ -2303,7 +2275,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 						Rotation = math.deg(math.atan2(dy, dx)),
 					}
 					if animate and not fresh then
-						tween(s, TI_MED, props)
+						tween(s, TI_MORPH, props)
 					else
 						s.Position = props.Position
 						s.Size = props.Size
@@ -2347,7 +2319,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 							Size = UDim2.fromOffset(colW, math.max(h - 1 - y, 0)),
 						}
 						if animate and not fresh then
-							tween(f, TI_MED, props)
+							tween(f, TI_MORPH, props)
 						else
 							f.Position = props.Position
 							f.Size = props.Size
@@ -2358,18 +2330,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			local function applyHover(i)
 				if hoverIdx == i then return end
-				if hoverIdx and glows[hoverIdx] then
-					local g = glows[hoverIdx]
-					tween(g.core, TI_FAST, {Size = UDim2.fromOffset(10, 10), BackgroundColor3 = Theme.Knob})
-					tween(g.a, TI_MED, {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1})
-					tween(g.b, TI_MED, {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1})
+				if hoverIdx and dots[hoverIdx] then
+					tween(dots[hoverIdx], TI_MED, {Size = UDim2.fromOffset(10, 10), BackgroundColor3 = Theme.Knob})
 				end
 				hoverIdx = i
-				local g = i and glows[i]
-				if g then
-					tween(g.core, TI_FAST, {Size = UDim2.fromOffset(16, 16), BackgroundColor3 = Theme.Accent})
-					tween(g.a, TI_MED, {Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 0.68})
-					tween(g.b, TI_MED, {Size = UDim2.fromOffset(52, 52), BackgroundTransparency = 0.88})
+				local d = i and dots[i]
+				if d then
+					tween(d, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(19, 19), BackgroundColor3 = Theme.AccentSoft})
 					hairline.Position = UDim2.fromOffset(xsCache[i], 0)
 					hairline.Visible = true
 					setValue(fmt(points[i]))
@@ -2400,10 +2367,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local function entrance()
 				if played or #dots == 0 then return end
 				played = true
-				for i, g in ipairs(glows) do
-					g.core.Size = UDim2.fromOffset(0, 0)
+				for i, d in ipairs(dots) do
+					d.Size = UDim2.fromOffset(0, 0)
 					task.delay(0.05 + i * 0.045, function()
-						tween(g.core, TI_MED, {Size = UDim2.fromOffset(10, 10)})
+						tween(d, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(10, 10)})
 					end)
 				end
 				for i, s in ipairs(segs) do
@@ -2471,6 +2438,23 @@ function RayfieldLibrary:CreateWindow(Settings)
 					redraw(true)
 				end
 			end
+			local function ripple(i)
+				local x, y = xsCache[i], ysCache[i]
+				if not x or not y then return end
+				local r = create("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromOffset(x, y),
+					Size = UDim2.fromOffset(12, 12),
+					BackgroundColor3 = Theme.AccentSoft,
+					BackgroundTransparency = 0.55,
+					ZIndex = 3,
+					Parent = dotHolder,
+				})
+				roundFull(r)
+				tween(r, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(56, 56), BackgroundTransparency = 1})
+				task.delay(0.65, function() r:Destroy() end)
+			end
+
 			function Chart:Push(v)
 				local nv = tonumber(v)
 				if not nv then return end
@@ -2479,6 +2463,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				while #points > maxPoints do table.remove(points, 1) end
 				setValue(fmt(points[#points]))
 				redraw(true)
+				task.delay(0.16, function() ripple(#points) end)
 			end
 			return Chart
 		end
