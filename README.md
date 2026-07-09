@@ -1,13 +1,8 @@
 # Rayfield Gen 2 [fanmade]
 
-A fan made reimagining of the Rayfield UI library for Roblox Luau. Gen 2 rebuilds the
-interface from scratch with a cleaner look, smoother animations, and a friendlier feel,
-while keeping the original Rayfield API so most existing scripts drop in with little or
-no change.
+Fan remake of the Rayfield UI library for Roblox executors. Same API as the original, so scripts written for Rayfield mostly just work. The interface itself is rebuilt from zero. Darker, rounder, better animations.
 
-> This is an unofficial community project. It is not affiliated with or endorsed by
-> Sirius or the original Rayfield authors. Original Rayfield lives at
-> [docs.sirius.menu/rayfield](https://docs.sirius.menu/rayfield).
+> Not affiliated with Sirius or the actual Rayfield devs. The real Rayfield lives at [docs.sirius.menu/rayfield](https://docs.sirius.menu/rayfield).
 
 ## Loading
 
@@ -17,23 +12,20 @@ local Rayfield = loadstring(game:HttpGet(
 ))()
 ```
 
-See `example.lua` for a full demo covering every element.
+There's a full demo in `example.lua` with every element in it.
 
-## What Gen 2 adds
+## What's different
 
-* New visual language: dark gradient window with a soft drop shadow, pill tabs
-  with icons, dark track toggles with a glowing pill knob, gradient sliders with
-  a glowing white knob
-* Hide animation that morphs the window into a small "Tap to show" pill at the top
-  of the screen, plus minimize to a title bar
-* Smooth tween follow dragging, animated tab transitions, and a loading screen
-  that expands into the window
-* Built in search that filters the elements of the current tab
-* Notifications that auto size, wrap, pause on hover, and dismiss on click
-* Sign in toast that appears when you play on a different account than last time
-* Stat cards with a green gradient for showing values like currency
-* Header badge pill, for things like a language or region tag
-* Key system with saved keys and keys fetched from a site
+* dark gradient window with a soft shadow, pill tabs, iOS style toggles, gradient sliders
+* closing doesn't kill the UI. the window morphs into a small "Tap to show" pill at the top of the screen. the dash minimizes into the title bar instead
+* stat cards for currency and similar values. when the number changes it rolls like an odometer instead of just swapping
+* rows and columns, so elements can sit side by side or in two column pages
+* search icon in the header filters whatever tab you're on
+* notifications stack bottom right, size themselves to their text, pause while hovered, click to dismiss early
+* dragging follows the cursor with a tween instead of snapping
+* toast when you play on a different account than last run
+* badge pill in the header, useful for region or language tags
+* key system. saved keys and fetching the key from a site both work
 
 ## Creating a window
 
@@ -74,8 +66,7 @@ Tab:CreateDivider()
 
 ## Elements
 
-Every element accepts an optional `Icon` (lucide name or Roblox asset id) and an
-optional `Description` shown as muted text under the element.
+Every element takes an optional `Icon` (lucide name or Roblox asset id) and an optional `Description` that shows as muted text under it.
 
 ```lua
 Tab:CreateButton({
@@ -137,7 +128,7 @@ Tab:CreateColorPicker({
 })
 ```
 
-### Stat cards (new in Gen 2)
+### Stat cards
 
 ```lua
 local Stat = Tab:CreateStat({
@@ -149,12 +140,9 @@ local Stat = Tab:CreateStat({
 Stat:Set({Value = "$40", Delta = "+90%"})
 ```
 
-### Rows and columns (new in Gen 2)
+### Rows and columns
 
-Rows place elements side by side with equal widths. Columns split the page into
-vertical stacks. Both return the same element API as a tab, in a compact style:
-buttons center their content, sliders stack the track under the labels, stat
-cards become small pills, and descriptions are skipped.
+Rows put elements next to each other with equal widths. Columns split the page into vertical stacks. Both give you the same element API a tab does, just compact: buttons center their content, sliders stack the track under the labels, stat cards shrink into pills, descriptions get skipped.
 
 ```lua
 local Row = Tab:CreateRow()
@@ -181,7 +169,7 @@ Rayfield:Notify({
 
 ## Updating elements from code
 
-Every element returns an object with a `Set` method, same as original Rayfield:
+Elements return an object with `Set`, same as original Rayfield:
 
 ```lua
 local Toggle = Tab:CreateToggle({...})
@@ -194,9 +182,7 @@ Dropdown:Refresh({"Sword", "Bow", "Staff", "Axe"})
 
 ## Configuration saving
 
-Set a `Flag` on any element and enable `ConfigurationSaving` in the window settings.
-Values save automatically when they change. Call this at the end of your script to
-restore them:
+Give an element a `Flag` and turn on `ConfigurationSaving` in the window settings. Values save on change. Call this at the end of your script to load them back:
 
 ```lua
 Rayfield:LoadConfiguration()
@@ -211,24 +197,15 @@ Rayfield:SetVisibility(true)
 Rayfield:Destroy()
 ```
 
-The gear icon in the header opens a built in settings page where the user can rebind
-the toggle key, unlock the cursor for FPS games that lock it, or unload the
-interface. The dash minimizes to a bar, the X hides to the pill, and the search icon
-filters the current tab.
+The gear in the header opens a settings page where you can rebind the toggle key, unlock the cursor for games that lock it, or unload the whole thing.
 
 ## Icons
 
-Icons use the lucide icon set through the same public icon index the original Rayfield
-uses, so lucide names work ("house", "coins", "settings"). The index ships an older
-lucide release, so common renamed icons are aliased automatically (for example
-"house" resolves to "home" and "chart-no-axes-column" to "bar-chart-3"). Plain Roblox
-asset ids work too. The index is cached to your executor's workspace folder after the
-first run, so icons keep working offline. If it cannot be fetched at all, the UI
-simply renders without icons.
+Lucide names work ("house", "coins", "settings"). The icon index Rayfield uses is an older lucide release, so renamed icons get aliased automatically, "house" resolves to "home" and so on. Plain asset ids work too. The index gets cached in your executor's workspace folder after the first run so icons keep working offline. If it can't be fetched at all the UI just renders without icons.
 
 ## Known gaps
 
-* Themes beyond color overrides through `Window.ModifyTheme` are not implemented
+* themes beyond color overrides through `Window.ModifyTheme` aren't done yet
 
 ## License
 
