@@ -2096,25 +2096,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -15, 0.5, 0),
 				Size = UDim2.fromOffset(58, 26),
-				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
 			})
+			paint(track, "BackgroundColor3", "ToggleTrack")
 			roundFull(track)
-			-- dark pill with a barely-there inner light at the very top
-			-- edge, so it reads as recessed rather than flat or gray
-			create("UIGradient", {
-				Rotation = 90,
-				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 40)),
-					ColorSequenceKeypoint.new(0.12, Color3.fromRGB(30, 30, 30)),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 24, 24)),
-				}),
-				Parent = track,
-			})
-			-- thin soft rim, low contrast so it whispers the boundary
 			local trackStroke = create("UIStroke", {
-				Color = Color3.fromRGB(0, 0, 0),
-				Thickness = 1,
-				Transparency = 0.55,
+				Color = Color3.fromRGB(255, 255, 255),
+				Transparency = 0.84,
 				Parent = track,
 			})
 			track.Parent = card
