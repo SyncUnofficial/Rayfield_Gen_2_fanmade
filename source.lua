@@ -305,6 +305,23 @@ local function getLucide(name)
 end
 
 local function loadIcons()
+	-- a bundled icon module wins over everything. this is how the index is
+	-- provided in Studio, where the client cannot run http or loadstring.
+	-- drop a ModuleScript named "RayfieldGen2Icons" that returns the index
+	-- next to the library and it is used with no network at all
+	local okMod, bundled = pcall(function()
+		local RS = game:GetService("ReplicatedStorage")
+		local iconMod = RS:FindFirstChild("RayfieldGen2Icons")
+		if iconMod and iconMod:IsA("ModuleScript") then
+			return require(iconMod)
+		end
+		return nil
+	end)
+	if okMod and type(bundled) == "table" and bundled["48px"] then
+		Icons = bundled
+		return
+	end
+
 	local cachePath = BASE_FOLDER .. "/icons_cache.lua"
 	local source = safeReadFile(cachePath)
 	local fresh = false
