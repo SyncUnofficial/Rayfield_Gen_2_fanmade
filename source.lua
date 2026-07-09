@@ -2184,7 +2184,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = plot,
 			})
 
-			local dots, segs, cols = {}, {}, {}
+			local dots, segs, cols, colTargets = {}, {}, {}, {}
 			local xsCache, ysCache = {}, {}
 			local hoverIdx = nil
 
@@ -2318,6 +2318,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 							Position = UDim2.fromOffset((c - 1) * colW, h - 1),
 							Size = UDim2.fromOffset(colW, math.max(h - 1 - y, 0)),
 						}
+						colTargets[c] = props.Size
 						if animate and not fresh then
 							tween(f, TI_MORPH, props)
 						else
@@ -2365,49 +2366,49 @@ function RayfieldLibrary:CreateWindow(Settings)
 				applyHover(nil)
 			end)
 
-			local played = false
+			local animToken = 0
 			local function entrance()
-				if played or #dots == 0 then return end
-				played = true
+				if #dots == 0 then return end
+				animToken = animToken + 1
+				local my = animToken
+				local w = plot.AbsoluteSize.X
+				if w < 24 then return end
+				local D = 0.75
+				segHolder.ClipsDescendants = true
+				segHolder.Size = UDim2.new(0, 0, 1, 0)
+				tween(segHolder, TweenInfo.new(D, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
+				task.delay(D + 0.1, function()
+					if my == animToken then
+						segHolder.ClipsDescendants = false
+						segHolder.Size = UDim2.fromScale(1, 1)
+					end
+				end)
 				for i, d in ipairs(dots) do
 					d.Size = UDim2.fromOffset(0, 0)
-					task.delay(0.05 + i * 0.045, function()
-						tween(d, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(10, 10)})
-					end)
-				end
-				for i, s in ipairs(segs) do
-					s.BackgroundTransparency = 1
-					task.delay(0.1 + i * 0.045, function()
-						tween(s, TI_MED, {BackgroundTransparency = 0})
+					local at = math.clamp((xsCache[i] or 0) / w, 0, 1)
+					task.delay(at * D * 0.62, function()
+						if my ~= animToken then return end
+						tween(d, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(10, 10)})
 					end)
 				end
 				for c, f in ipairs(cols) do
-					local target = f.Size
+					local target = colTargets[c] or f.Size
 					f.Size = UDim2.fromOffset(target.X.Offset, 0)
-					task.delay(0.05 + c * 0.005, function()
-						tween(f, TI_SMOOTH, {Size = target})
+					local at = math.clamp(((c - 0.5) * 4) / w, 0, 1)
+					task.delay(at * D * 0.62 + 0.05, function()
+						if my ~= animToken then return end
+						tween(f, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = target})
 					end)
 				end
 			end
-			local function armEntrance()
-				if played then return end
-				local blocker
+
+			local function chainVisible()
 				local a = card
 				while a and not a:IsA("ScreenGui") do
-					if a:IsA("GuiObject") and not a.Visible then blocker = a end
+					if a:IsA("GuiObject") and not a.Visible then return false end
 					a = a.Parent
 				end
-				if blocker then
-					local conn
-					conn = blocker:GetPropertyChangedSignal("Visible"):Connect(function()
-						if blocker.Visible then
-							conn:Disconnect()
-							task.defer(armEntrance)
-						end
-					end)
-				else
-					entrance()
-				end
+				return true
 			end
 
 			plot:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -2415,7 +2416,19 @@ function RayfieldLibrary:CreateWindow(Settings)
 			end)
 			task.defer(function()
 				redraw(false)
-				armEntrance()
+				local node = card.Parent
+				while node and not node:IsA("ScreenGui") do
+					if node:IsA("GuiObject") then
+						local n = node
+						n:GetPropertyChangedSignal("Visible"):Connect(function()
+							if n.Visible and chainVisible() then
+								task.defer(entrance)
+							end
+						end)
+					end
+					node = node.Parent
+				end
+				if chainVisible() then entrance() end
 			end)
 
 			local Chart = {}
@@ -2466,6 +2479,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 				setValue(fmt(points[#points]))
 				redraw(true)
 				task.delay(0.16, function() ripple(#points) end)
+			end
+			function Chart:Replay()
+				if hoverIdx then applyHover(nil) end
+				entrance()
 			end
 			return Chart
 		end

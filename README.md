@@ -139,6 +139,7 @@ local Revenue = Tab:CreateChart({
 	Points = {8200, 8600, 8400, 9300, 9100, 9900, 11400, 12400},
 })
 Revenue:Push(13100)
+Revenue:Replay()
 
 Tab:CreateChart({
 	Name = "Players Online",

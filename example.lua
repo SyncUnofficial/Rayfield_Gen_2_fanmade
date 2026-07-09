@@ -171,6 +171,15 @@ Numbers:CreateButton({
 	end,
 })
 
+Numbers:CreateButton({
+	Name = "Show Graph Animation",
+	Icon = "play",
+	Callback = function()
+		Revenue:Replay()
+		Players:Replay()
+	end,
+})
+
 Numbers:CreateToggle({
 	Name = "Automatic Trade Negotiation",
 	Icon = "message-square",
