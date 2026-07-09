@@ -607,7 +607,8 @@ function RayfieldLibrary:Notify(data)
 		Parent = holder,
 	})
 	round(card, 20)
-	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.94, Parent = card})
+	-- UIStroke on a CanvasGroup is not driven by GroupTransparency, so fade it by hand
+	local cardStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Parent = card})
 
 	if hasIcon then
 		local icon = makeIcon(card, data.Image, ICON_BOX, Theme.TextTitle)
@@ -667,6 +668,7 @@ function RayfieldLibrary:Notify(data)
 		dismissed = true
 		-- fade out, then collapse the slot so the stack settles up into the gap
 		tween(card, FADE, {GroupTransparency = 1})
+		tween(cardStroke, FADE, {Transparency = 1})
 		tween(glow, FADE, {ImageTransparency = 1})
 		task.wait(0.2)
 		tween(holder, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Size = UDim2.new(1, -90, 0, 0)})
@@ -684,6 +686,7 @@ function RayfieldLibrary:Notify(data)
 		tween(holder, GROW, {Size = UDim2.new(1, 0, 0, fullH)})
 		task.wait(0.15)
 		tween(card, FADE, {GroupTransparency = 0})
+		tween(cardStroke, FADE, {Transparency = 0.94})
 		task.wait(0.05)
 		tween(glow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.72})
 
