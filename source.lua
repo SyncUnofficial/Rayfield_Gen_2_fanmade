@@ -251,6 +251,70 @@ local function measureWrapped(text, size, font, width)
 	return math.ceil(#text / perLine) * (size + 3)
 end
 
+-- pull the number out of a value string, keeping any prefix/suffix like "$" or "%"
+local function parseNumeric(s)
+	s = tostring(s)
+	local i, j = s:find("%-?%d[%d,]*%.?%d*")
+	if not i then return nil end
+	local numStr = s:sub(i, j)
+	return tonumber((numStr:gsub(",", ""))), s:sub(1, i - 1), s:sub(j + 1), numStr
+end
+
+local function addThousands(s)
+	local sign = ""
+	if s:sub(1, 1) == "-" then sign = "-"; s = s:sub(2) end
+	s = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	if s:sub(1, 1) == "," then s = s:sub(2) end
+	return sign .. s
+end
+
+-- returns setText(value): counts the label from its last number up or down to the
+-- new one, keeping the prefix/suffix and decimals. non numeric values just set.
+local function countingValue(label, initial)
+	local token = 0
+	local current = initial ~= nil and parseNumeric(initial) or nil
+	return function(newValue)
+		local targetN, prefix, suffix, targetNumStr = parseNumeric(newValue)
+		if not targetN then
+			label.Text = tostring(newValue)
+			current = nil
+			return
+		end
+		local decimals = 0
+		local dot = targetNumStr:find("%.")
+		if dot then decimals = #targetNumStr - dot end
+		local hasComma = targetNumStr:find(",") ~= nil
+		local startN = current or targetN
+		token = token + 1
+		local myToken = token
+		local function fmt(n)
+			local str = decimals > 0 and string.format("%." .. decimals .. "f", n) or tostring(math.floor(n + 0.5))
+			if hasComma then str = addThousands(str) end
+			return prefix .. str .. suffix
+		end
+		if startN == targetN then
+			label.Text = fmt(targetN)
+			current = targetN
+			return
+		end
+		local duration = math.clamp(math.abs(targetN - startN) * 0.02, 0.35, 0.9)
+		task.spawn(function()
+			local elapsed = 0
+			while elapsed < duration do
+				if myToken ~= token then return end
+				local dt = task.wait()
+				elapsed = math.min(elapsed + dt, duration)
+				local a = 1 - (1 - elapsed / duration) ^ 3
+				label.Text = fmt(startN + (targetN - startN) * a)
+			end
+			if myToken == token then
+				label.Text = fmt(targetN)
+				current = targetN
+			end
+		end)
+	end
+end
+
 -- icons
 -- lucide icons through the same generated index original Rayfield uses.
 -- the index is an older lucide set, so newer names are mapped back through
@@ -1834,12 +1898,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local StatValue = {}
 				local lastValue = StatSettings.Value
 				local lastDelta = StatSettings.Delta
+				local rightSet = countingValue(rightLabel, lastValue or lastDelta)
 				function StatValue:Set(newSettings)
 					newSettings = newSettings or {}
 					if newSettings.Name then nameLabel.Text = newSettings.Name end
 					if newSettings.Value ~= nil then lastValue = newSettings.Value end
 					if newSettings.Delta ~= nil then lastDelta = newSettings.Delta end
-					rightLabel.Text = tostring(lastValue or lastDelta or "")
+					rightSet(lastValue or lastDelta or "")
 				end
 				return StatValue
 			end
@@ -1905,11 +1970,12 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Text = tostring(StatSettings.Delta or ""),
 				Parent = card,
 			})
+			local setValue = countingValue(valueLabel, StatSettings.Value)
 			local StatValue = {}
 			function StatValue:Set(newSettings)
 				newSettings = newSettings or {}
 				if newSettings.Name then nameLabel.Text = newSettings.Name end
-				if newSettings.Value ~= nil then valueLabel.Text = tostring(newSettings.Value) end
+				if newSettings.Value ~= nil then setValue(newSettings.Value) end
 				if newSettings.Delta ~= nil then deltaLabel.Text = tostring(newSettings.Delta) end
 			end
 			return StatValue
