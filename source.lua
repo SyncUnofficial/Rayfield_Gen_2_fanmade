@@ -2096,12 +2096,21 @@ function RayfieldLibrary:CreateWindow(Settings)
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -15, 0.5, 0),
 				Size = UDim2.fromOffset(58, 26),
+				BackgroundColor3 = Color3.fromRGB(46, 46, 46),
 			})
-			paint(track, "BackgroundColor3", "ToggleTrack")
 			roundFull(track)
+			-- soft top-lit gradient so the pill reads as a raised surface
+			-- instead of a flat cutout, matching the reference switch
+			create("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(Color3.fromRGB(58, 58, 58), Color3.fromRGB(34, 34, 34)),
+				Parent = track,
+			})
+			-- crisp dark rim defines the boundary
 			local trackStroke = create("UIStroke", {
-				Color = Color3.fromRGB(255, 255, 255),
-				Transparency = 0.84,
+				Color = Color3.fromRGB(12, 12, 12),
+				Thickness = 1.4,
+				Transparency = 0.35,
 				Parent = track,
 			})
 			track.Parent = card
