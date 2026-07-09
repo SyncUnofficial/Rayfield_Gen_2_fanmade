@@ -315,6 +315,151 @@ local function countingValue(label, initial)
 	end
 end
 
+-- odometer roll: overlays a value label with a row of clipped digit
+-- strips and rolls each digit vertically to its target, ones place
+-- settling last, like a slot machine / car odometer. non numeric
+-- values fall back to plain text. drop in replacement for countingValue.
+local function odometerValue(label, initial)
+	label.TextTransparency = 1
+	local font, size, color = label.Font, label.TextSize, label.TextColor3
+	local cellH = TextService:GetTextSize("0", size, font, Vector2.new(2000, 2000)).Y
+	local digitW = 0
+	for d = 0, 9 do
+		digitW = math.max(digitW, TextService:GetTextSize(tostring(d), size, font, Vector2.new(2000, 2000)).X)
+	end
+	digitW = math.ceil(digitW) + 1
+
+	local row = create("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = label.AnchorPoint,
+		Position = label.Position,
+		Size = UDim2.new(0, 0, 0, cellH),
+		AutomaticSize = Enum.AutomaticSize.X,
+		ZIndex = label.ZIndex,
+		Parent = label.Parent,
+	})
+	create("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = row,
+	})
+
+	local token = 0
+	local prevDigits = {}
+	local function digitsOf(s)
+		local t = {}
+		for ch in s:gmatch("%d") do t[#t + 1] = ch end
+		return t
+	end
+
+	local function setVal(newValue, animate)
+		local targetN, prefix, suffix, targetNumStr = parseNumeric(newValue)
+		if not targetN then
+			row.Visible = false
+			label.TextTransparency = 0
+			label.Text = tostring(newValue)
+			prevDigits = {}
+			return
+		end
+		label.Text = ""
+		row.Visible = true
+		local decimals = 0
+		local dot = targetNumStr:find("%.")
+		if dot then decimals = #targetNumStr - dot end
+		local hasComma = targetNumStr:find(",") ~= nil
+		local function fmt(n)
+			local str = decimals > 0 and string.format("%." .. decimals .. "f", n) or tostring(math.floor(n + 0.5))
+			if hasComma then str = addThousands(str) end
+			return prefix .. str .. suffix
+		end
+		local targetStr = fmt(targetN)
+		token = token + 1
+
+		local tDigits = digitsOf(targetStr)
+		local nT, nP = #tDigits, #prevDigits
+		for _, ch in ipairs(row:GetChildren()) do
+			if ch:IsA("GuiObject") then ch:Destroy() end
+		end
+
+		local digitIndex, order = 0, 0
+		local strips = {}
+		for i = 1, #targetStr do
+			local chr = targetStr:sub(i, i)
+			order = order + 1
+			if chr:match("%d") then
+				digitIndex = digitIndex + 1
+				local posFromRight = nT - digitIndex
+				local pIdx = nP - posFromRight
+				local startD = (pIdx >= 1 and prevDigits[pIdx]) and tonumber(prevDigits[pIdx]) or 0
+				local targetD = tonumber(chr)
+				local cell = create("Frame", {
+					BackgroundTransparency = 1,
+					Size = UDim2.fromOffset(digitW, cellH),
+					ClipsDescendants = true,
+					LayoutOrder = order,
+					ZIndex = row.ZIndex,
+					Parent = row,
+				})
+				local strip = create("Frame", {
+					BackgroundTransparency = 1,
+					Size = UDim2.new(1, 0, 10, 0),
+					Position = UDim2.fromOffset(0, -startD * cellH),
+					ZIndex = row.ZIndex,
+					Parent = cell,
+				})
+				for d = 0, 9 do
+					create("TextLabel", {
+						BackgroundTransparency = 1,
+						Position = UDim2.fromOffset(0, d * cellH),
+						Size = UDim2.fromOffset(digitW, cellH),
+						Font = font,
+						TextSize = size,
+						TextColor3 = color,
+						Text = tostring(d),
+						TextXAlignment = Enum.TextXAlignment.Center,
+						TextYAlignment = Enum.TextYAlignment.Center,
+						ZIndex = row.ZIndex,
+						Parent = strip,
+					})
+				end
+				strips[#strips + 1] = { strip = strip, startD = startD, targetD = targetD, posFromRight = posFromRight }
+			else
+				local w = math.ceil(TextService:GetTextSize(chr, size, font, Vector2.new(2000, 2000)).X)
+				create("TextLabel", {
+					BackgroundTransparency = 1,
+					Size = UDim2.fromOffset(math.max(w, 3), cellH),
+					Font = font,
+					TextSize = size,
+					TextColor3 = color,
+					Text = chr,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					LayoutOrder = order,
+					ZIndex = row.ZIndex,
+					Parent = row,
+				})
+			end
+		end
+
+		prevDigits = tDigits
+		local maxR = math.max(1, nT - 1)
+		for _, s in ipairs(strips) do
+			local dest = UDim2.fromOffset(0, -s.targetD * cellH)
+			if animate == false or s.startD == s.targetD then
+				s.strip.Position = dest
+			else
+				local frac = s.posFromRight / maxR
+				local duration = 0.35 + 0.5 * (1 - frac)
+				tween(s.strip, TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = dest })
+			end
+		end
+	end
+
+	if initial ~= nil then setVal(initial, false) end
+	return setVal
+end
+
 -- icons
 -- lucide icons through the same generated index original Rayfield uses.
 -- the index is an older lucide set, so newer names are mapped back through
@@ -1932,7 +2077,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local StatValue = {}
 				local lastValue = StatSettings.Value
 				local lastDelta = StatSettings.Delta
-				local rightSet = countingValue(rightLabel, lastValue or lastDelta)
+				local rightSet = odometerValue(rightLabel, lastValue or lastDelta)
 				function StatValue:Set(newSettings)
 					newSettings = newSettings or {}
 					if newSettings.Name then nameLabel.Text = newSettings.Name end
@@ -2004,7 +2149,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Text = tostring(StatSettings.Delta or ""),
 				Parent = card,
 			})
-			local setValue = countingValue(valueLabel, StatSettings.Value)
+			local setValue = odometerValue(valueLabel, StatSettings.Value)
 			local StatValue = {}
 			function StatValue:Set(newSettings)
 				newSettings = newSettings or {}
