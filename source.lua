@@ -2073,6 +2073,332 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return StatValue
 		end
 
+		function Tab:CreateChart(ChartSettings)
+			ChartSettings = ChartSettings or {}
+			local points = {}
+			for _, v in ipairs(ChartSettings.Points or {}) do
+				local n = tonumber(v)
+				if n then points[#points + 1] = n end
+			end
+			if #points == 0 then points = {0, 0} end
+			if #points == 1 then points = {points[1], points[1]} end
+			local prefix = ChartSettings.Prefix or ""
+			local suffix = ChartSettings.Suffix or ""
+			local decimals = ChartSettings.Decimals or 0
+			local filled = ChartSettings.Filled ~= false
+			local maxPoints = ChartSettings.MaxPoints or math.max(#points, 12)
+
+			local cardH = compact and 118 or 152
+			local plotTop = compact and 38 or 44
+			local card = create("Frame", {
+				Size = UDim2.new(1, 0, 0, cardH),
+				LayoutOrder = nextOrder(),
+				ClipsDescendants = true,
+				Parent = page,
+			})
+			card:SetAttribute("SearchName", ChartSettings.Name or "")
+			paint(card, "BackgroundColor3", "Card")
+			cardBase(card)
+
+			local textX = 17
+			if ChartSettings.Icon then
+				local ic = makeIcon(card, ChartSettings.Icon, 18, Theme.TextTitle, 0.04)
+				if ic then
+					ic.Position = UDim2.fromOffset(16, compact and 11 or 13)
+					textX = 44
+				end
+			end
+			local nameLabel = create("TextLabel", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(textX, compact and 11 or 13),
+				Size = UDim2.new(0.5, -textX, 0, 18),
+				Font = FONT_BOLD,
+				TextSize = 16,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				Text = ChartSettings.Name or "",
+				Parent = card,
+			})
+			paint(nameLabel, "TextColor3", "TextTitle")
+			local valueLabel = create("TextLabel", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -17, 0, compact and 9 or 11),
+				Size = UDim2.new(0.4, 0, 0, 22),
+				Font = FONT_BOLD,
+				TextSize = compact and 17 or 20,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				Text = "",
+				Parent = card,
+			})
+			paint(valueLabel, "TextColor3", "TextTitle")
+
+			local plot = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(17, plotTop),
+				Size = UDim2.new(1, -34, 1, -plotTop - 14),
+				Parent = card,
+			})
+			create("Frame", {
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.93,
+				BorderSizePixel = 0,
+				Position = UDim2.new(0, 0, 0.5, 0),
+				Size = UDim2.new(1, 0, 0, 1),
+				Parent = plot,
+			})
+			create("Frame", {
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.93,
+				BorderSizePixel = 0,
+				Position = UDim2.new(0, 0, 1, -1),
+				Size = UDim2.new(1, 0, 0, 1),
+				Parent = plot,
+			})
+			local hairline = create("Frame", {
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.82,
+				BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Size = UDim2.new(0, 1, 1, 0),
+				Visible = false,
+				ZIndex = 2,
+				Parent = plot,
+			})
+
+			local fillHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				Parent = plot,
+			})
+			local segHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 3,
+				Parent = plot,
+			})
+			local dotHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 4,
+				Parent = plot,
+			})
+
+			local dots, segs, cols, glows = {}, {}, {}, {}
+			local xsCache, ysCache = {}, {}
+			local hoverIdx = nil
+
+			local function fmt(n)
+				local str = decimals > 0 and string.format("%." .. decimals .. "f", n) or tostring(math.floor(n + 0.5))
+				return prefix .. commafy(str) .. suffix
+			end
+			local setValue = odometerValue(valueLabel, fmt(points[#points]))
+
+			local function redraw(animate)
+				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
+				if w < 24 or h < 24 then return end
+				local n = #points
+				local lo, hi = points[1], points[1]
+				for _, v in ipairs(points) do
+					if v < lo then lo = v end
+					if v > hi then hi = v end
+				end
+				local range = hi - lo
+				if range == 0 then range = math.max(math.abs(hi), 1) end
+				for i = 1, n do
+					xsCache[i] = math.floor((i - 1) / (n - 1) * (w - 10) + 5.5)
+					ysCache[i] = math.floor(10 + (1 - (points[i] - lo) / range) * (h - 22) + 0.5)
+				end
+				for i = #xsCache, n + 1, -1 do
+					xsCache[i] = nil
+					ysCache[i] = nil
+				end
+
+				for i = #dots, n + 1, -1 do
+					dots[i]:Destroy()
+					dots[i] = nil
+					glows[i] = nil
+				end
+				for i = #segs, n, -1 do
+					segs[i]:Destroy()
+					segs[i] = nil
+				end
+
+				for i = 1, n do
+					local d = dots[i]
+					local fresh = not d
+					if fresh then
+						d = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Size = UDim2.fromOffset(9, 9),
+							ZIndex = 4,
+							Parent = dotHolder,
+						})
+						paint(d, "BackgroundColor3", "Knob")
+						roundFull(d)
+						glows[i] = softGlow(d, Theme.AccentSoft, 1, 26, 4)
+						dots[i] = d
+					end
+					local target = UDim2.fromOffset(xsCache[i], ysCache[i])
+					if animate and not fresh then
+						tween(d, TI_MED, {Position = target})
+					else
+						d.Position = target
+					end
+				end
+
+				for i = 1, n - 1 do
+					local s = segs[i]
+					local fresh = not s
+					if fresh then
+						s = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BorderSizePixel = 0,
+							ZIndex = 3,
+							Parent = segHolder,
+						})
+						paint(s, "BackgroundColor3", "AccentSoft")
+						roundFull(s)
+						segs[i] = s
+					end
+					local dx = xsCache[i + 1] - xsCache[i]
+					local dy = ysCache[i + 1] - ysCache[i]
+					local props = {
+						Position = UDim2.fromOffset(xsCache[i] + dx / 2, ysCache[i] + dy / 2),
+						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + 2, 3),
+						Rotation = math.deg(math.atan2(dy, dx)),
+					}
+					if animate and not fresh then
+						tween(s, TI_MED, props)
+					else
+						s.Position = props.Position
+						s.Size = props.Size
+						s.Rotation = props.Rotation
+					end
+				end
+
+				if filled then
+					local colW = 4
+					local count = math.floor(w / colW)
+					for i = #cols, count + 1, -1 do
+						cols[i]:Destroy()
+						cols[i] = nil
+					end
+					local seg = 1
+					for c = 1, count do
+						local f = cols[c]
+						local fresh = not f
+						if fresh then
+							f = create("Frame", {
+								AnchorPoint = Vector2.new(0, 1),
+								BorderSizePixel = 0,
+								BackgroundTransparency = 0.16,
+								Parent = fillHolder,
+							})
+							paint(f, "BackgroundColor3", "AccentDark")
+							create("UIGradient", {
+								Rotation = 90,
+								Transparency = NumberSequence.new(0, 0.62),
+								Parent = f,
+							})
+							cols[c] = f
+						end
+						local cx = (c - 0.5) * colW
+						while seg < n - 1 and xsCache[seg + 1] < cx do seg = seg + 1 end
+						local x1, x2 = xsCache[seg], xsCache[seg + 1]
+						local a = math.clamp((cx - x1) / math.max(x2 - x1, 1), 0, 1)
+						local y = ysCache[seg] + (ysCache[seg + 1] - ysCache[seg]) * a
+						local props = {
+							Position = UDim2.fromOffset((c - 1) * colW, h - 1),
+							Size = UDim2.fromOffset(colW, math.max(h - 1 - y, 0)),
+						}
+						if animate and not fresh then
+							tween(f, TI_MED, props)
+						else
+							f.Position = props.Position
+							f.Size = props.Size
+						end
+					end
+				end
+			end
+
+			local function applyHover(i)
+				if hoverIdx == i then return end
+				local old = hoverIdx and dots[hoverIdx]
+				if old then
+					tween(old, TI_FAST, {Size = UDim2.fromOffset(9, 9), BackgroundColor3 = Theme.Knob})
+					if glows[hoverIdx] then tween(glows[hoverIdx], TI_FAST, {ImageTransparency = 1}) end
+				end
+				hoverIdx = i
+				local d = i and dots[i]
+				if d then
+					tween(d, TI_FAST, {Size = UDim2.fromOffset(15, 15), BackgroundColor3 = Theme.Accent})
+					if glows[i] then tween(glows[i], TI_FAST, {ImageTransparency = 0.45}) end
+					hairline.Position = UDim2.fromOffset(xsCache[i], 0)
+					hairline.Visible = true
+					setValue(fmt(points[i]))
+				else
+					hairline.Visible = false
+					setValue(fmt(points[#points]))
+				end
+			end
+
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+				if #xsCache < 2 then return end
+				local rx = input.Position.X - plot.AbsolutePosition.X
+				local best, bestDist = nil, math.huge
+				for i = 1, #points do
+					local dist = math.abs((xsCache[i] or 0) - rx)
+					if dist < bestDist then
+						best, bestDist = i, dist
+					end
+				end
+				applyHover(best)
+			end)
+			card.MouseLeave:Connect(function()
+				applyHover(nil)
+			end)
+
+			plot:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				redraw(false)
+			end)
+			task.defer(function() redraw(false) end)
+
+			local Chart = {}
+			function Chart:Set(newSettings)
+				newSettings = newSettings or {}
+				if newSettings.Name then
+					nameLabel.Text = newSettings.Name
+					card:SetAttribute("SearchName", newSettings.Name)
+				end
+				if newSettings.Points then
+					local fresh = {}
+					for _, v in ipairs(newSettings.Points) do
+						local nv = tonumber(v)
+						if nv then fresh[#fresh + 1] = nv end
+					end
+					if #fresh == 0 then fresh = {0, 0} end
+					if #fresh == 1 then fresh = {fresh[1], fresh[1]} end
+					while #fresh > maxPoints do table.remove(fresh, 1) end
+					if hoverIdx then applyHover(nil) end
+					points = fresh
+					setValue(fmt(points[#points]))
+					redraw(true)
+				end
+			end
+			function Chart:Push(v)
+				local nv = tonumber(v)
+				if not nv then return end
+				if hoverIdx then applyHover(nil) end
+				points[#points + 1] = nv
+				while #points > maxPoints do table.remove(points, 1) end
+				setValue(fmt(points[#points]))
+				redraw(true)
+			end
+			return Chart
+		end
+
 		function Tab:CreateButton(ButtonSettings)
 			ButtonSettings = ButtonSettings or {}
 			local card, label

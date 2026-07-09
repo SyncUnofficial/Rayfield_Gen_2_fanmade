@@ -146,6 +146,31 @@ Numbers:CreateButton({
 	end,
 })
 
+Numbers:CreateSection("Charts")
+
+local Revenue = Numbers:CreateChart({
+	Name = "Revenue",
+	Icon = "coins",
+	Prefix = "$",
+	Points = {8200, 8600, 8400, 9300, 9100, 9900, 11400, 12400},
+})
+
+local Players = Numbers:CreateChart({
+	Name = "Players Online",
+	Suffix = " ccu",
+	Filled = false,
+	Points = {120, 180, 160, 260, 310, 290, 380, 430, 410, 540},
+})
+
+Numbers:CreateButton({
+	Name = "Push Data",
+	Icon = "trending-up",
+	Callback = function()
+		Revenue:Push(12400 + math.random(-1500, 2500))
+		Players:Push(540 + math.random(-120, 160))
+	end,
+})
+
 Numbers:CreateToggle({
 	Name = "Automatic Trade Negotiation",
 	Icon = "message-square",
