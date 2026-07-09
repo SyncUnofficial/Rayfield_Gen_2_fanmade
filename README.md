@@ -127,6 +127,28 @@ local Stat = Tab:CreateStat({
 Stat:Set({Value = "$40", Delta = "+90%"})
 ```
 
+### Charts
+
+Line charts with hover. Move the mouse over the card and a crosshair snaps to the nearest point, the value up top rolls to that point. `Filled` draws the area under the line, leave it off for a plain line. `Push` appends a point and drops the oldest once you hit `MaxPoints`.
+
+```lua
+local Revenue = Tab:CreateChart({
+	Name = "Revenue",
+	Icon = "coins",
+	Prefix = "$",
+	Points = {8200, 8600, 8400, 9300, 9100, 9900, 11400, 12400},
+})
+Revenue:Push(13100)
+
+Tab:CreateChart({
+	Name = "Players Online",
+	Suffix = " ccu",
+	Filled = false,
+	Points = {120, 180, 160, 260, 310, 290, 380, 430, 410, 540},
+	MaxPoints = 20,
+})
+```
+
 ### Rows and columns
 
 Rows put elements next to each other with equal widths. Columns split the page into vertical stacks. Both give you the same element API a tab does, just compact: buttons center their content, sliders stack the track under the labels, stat cards shrink into pills, descriptions get skipped.
