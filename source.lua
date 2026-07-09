@@ -1549,6 +1549,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Visible = false,
 			Parent = pagesHolder,
 		})
+		-- fade the content into the window at the top and bottom scroll edges
+		create("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.06, 0),
+				NumberSequenceKeypoint.new(0.94, 0),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+			Parent = pageWrapper,
+		})
 		local page = create("ScrollingFrame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
