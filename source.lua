@@ -12,7 +12,7 @@ local useStudio = RunService:IsStudio()
 
 local fsAvailable = writefile and readfile and isfile and isfolder and makefolder
 
-local function safeReadFile(path)
+local function readf(path)
 	if not fsAvailable then return nil end
 	local ok, result = pcall(function()
 		if isfile(path) then return readfile(path) end
@@ -22,13 +22,13 @@ local function safeReadFile(path)
 	return nil
 end
 
-local function safeWriteFile(path, content)
+local function writef(path, content)
 	if not fsAvailable then return false end
 	local ok = pcall(writefile, path, content)
 	return ok
 end
 
-local function ensureFolder(path)
+local function mkfolder(path)
 	if not fsAvailable then return false end
 	local ok = pcall(function()
 		if not isfolder(path) then makefolder(path) end
@@ -37,9 +37,9 @@ local function ensureFolder(path)
 end
 
 local BASE_FOLDER = "Rayfield Gen2"
-ensureFolder(BASE_FOLDER)
+mkfolder(BASE_FOLDER)
 
-local function httpGet(url)
+local function fetch(url)
 	local ok, result = pcall(function()
 		return game:HttpGet(url)
 	end)
@@ -65,7 +65,7 @@ local function httpGet(url)
 	return nil
 end
 
-local function getGuiParent()
+local function guiParent()
 	if useStudio then
 		return LocalPlayer:WaitForChild("PlayerGui")
 	end
@@ -226,7 +226,7 @@ local function measureWrapped(text, size, font, width)
 	return math.ceil(#text / perLine) * (size + 3)
 end
 
-local function parseNumeric(s)
+local function parsenum(s)
 	s = tostring(s)
 	local i, j = s:find("%-?%d[%d,]*%.?%d*")
 	if not i then return nil end
@@ -234,7 +234,7 @@ local function parseNumeric(s)
 	return tonumber((numStr:gsub(",", ""))), s:sub(1, i - 1), s:sub(j + 1), numStr
 end
 
-local function addThousands(s)
+local function commafy(s)
 	local sign = ""
 	if s:sub(1, 1) == "-" then sign = "-"; s = s:sub(2) end
 	s = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
@@ -244,9 +244,9 @@ end
 
 local function countingValue(label, initial)
 	local token = 0
-	local current = initial ~= nil and parseNumeric(initial) or nil
+	local current = initial ~= nil and parsenum(initial) or nil
 	return function(newValue)
-		local targetN, prefix, suffix, targetNumStr = parseNumeric(newValue)
+		local targetN, prefix, suffix, targetNumStr = parsenum(newValue)
 		if not targetN then
 			label.Text = tostring(newValue)
 			current = nil
@@ -261,7 +261,7 @@ local function countingValue(label, initial)
 		local myToken = token
 		local function fmt(n)
 			local str = decimals > 0 and string.format("%." .. decimals .. "f", n) or tostring(math.floor(n + 0.5))
-			if hasComma then str = addThousands(str) end
+			if hasComma then str = commafy(str) end
 			return prefix .. str .. suffix
 		end
 		if startN == targetN then
@@ -324,7 +324,7 @@ local function odometerValue(label, initial)
 	end
 
 	local function setVal(newValue, animate)
-		local targetN, prefix, suffix, targetNumStr = parseNumeric(newValue)
+		local targetN, prefix, suffix, targetNumStr = parsenum(newValue)
 		if not targetN then
 			row.Visible = false
 			label.TextTransparency = 0
@@ -340,7 +340,7 @@ local function odometerValue(label, initial)
 		local hasComma = targetNumStr:find(",") ~= nil
 		local function fmt(n)
 			local str = decimals > 0 and string.format("%." .. decimals .. "f", n) or tostring(math.floor(n + 0.5))
-			if hasComma then str = addThousands(str) end
+			if hasComma then str = commafy(str) end
 			return prefix .. str .. suffix
 		end
 		local targetStr = fmt(targetN)
@@ -506,10 +506,10 @@ local function loadIcons()
 	end
 
 	local cachePath = BASE_FOLDER .. "/icons_cache.lua"
-	local source = safeReadFile(cachePath)
+	local source = readf(cachePath)
 	local fresh = false
 	if not source then
-		source = httpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
+		source = fetch("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
 		fresh = true
 	end
 	if not source then return end
@@ -520,11 +520,11 @@ local function loadIcons()
 	if ok and type(result) == "table" and result["48px"] then
 		Icons = result
 		if fresh then
-			safeWriteFile(cachePath, source)
+			writef(cachePath, source)
 		end
 	elseif not fresh then
 
-		source = httpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
+		source = fetch("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
 		if source then
 			local ok2, result2 = pcall(function()
 				local chunk = loadstring(source)
@@ -532,7 +532,7 @@ local function loadIcons()
 			end)
 			if ok2 and type(result2) == "table" and result2["48px"] then
 				Icons = result2
-				safeWriteFile(cachePath, source)
+				writef(cachePath, source)
 			end
 		end
 	end
@@ -646,7 +646,7 @@ local function ensureRoot()
 	pcall(function()
 		if syn and syn.protect_gui then syn.protect_gui(rootGui) end
 	end)
-	rootGui.Parent = getGuiParent()
+	rootGui.Parent = guiParent()
 
 	notifyStack = create("Frame", {
 		Name = "Notifications",
@@ -891,7 +891,7 @@ local function runKeySystem(Settings)
 
 	if keySettings.GrabKeyFromSite then
 		for _, url in ipairs(rawKey) do
-			local body = httpGet(tostring(url))
+			local body = fetch(tostring(url))
 			if body then
 				body = string.gsub(body, "%s+$", "")
 				body = string.gsub(body, "^%s+", "")
@@ -919,7 +919,7 @@ local function runKeySystem(Settings)
 	end
 
 	if keySettings.SaveKey then
-		local saved = safeReadFile(keyPath)
+		local saved = readf(keyPath)
 		if saved and isValid(saved) then
 			return true
 		end
@@ -1080,7 +1080,7 @@ local function runKeySystem(Settings)
 		if isValid(box.Text) then
 			passed = true
 			if keySettings.SaveKey then
-				safeWriteFile(keyPath, box.Text)
+				writef(keyPath, box.Text)
 			end
 			tween(card, TI_MED, {Position = UDim2.fromScale(0.5, 0.54)})
 			tween(overlay, TI_MED, {BackgroundTransparency = 1})
@@ -1120,7 +1120,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		configFolder = Settings.ConfigurationSaving.FolderName or configFolder
 		configFile = Settings.ConfigurationSaving.FileName or configFile
 	end
-	if configEnabled then ensureFolder(configFolder) end
+	if configEnabled then mkfolder(configFolder) end
 
 	local savePending = false
 	local function saveConfiguration()
@@ -1143,16 +1143,16 @@ function RayfieldLibrary:CreateWindow(Settings)
 					out[flag] = {R = math.floor(c.R * 255 + 0.5), G = math.floor(c.G * 255 + 0.5), B = math.floor(c.B * 255 + 0.5)}
 				end
 			end
-			safeWriteFile(configFolder .. "/" .. configFile .. ".json", HttpService:JSONEncode(out))
+			writef(configFolder .. "/" .. configFile .. ".json", HttpService:JSONEncode(out))
 		end)
 	end
 
 	task.spawn(function()
 		if not fsAvailable or not LocalPlayer then return end
 		local path = BASE_FOLDER .. "/lastuser.txt"
-		local last = safeReadFile(path)
+		local last = readf(path)
 		local current = tostring(LocalPlayer.UserId)
-		safeWriteFile(path, current)
+		writef(path, current)
 		if last ~= nil and last ~= current then
 			task.wait(0.5)
 			showAccountToast()
@@ -3525,7 +3525,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	function RayfieldLibrary:LoadConfiguration()
 		if not configEnabled then return end
-		local raw = safeReadFile(configFolder .. "/" .. configFile .. ".json")
+		local raw = readf(configFolder .. "/" .. configFile .. ".json")
 		if not raw then return end
 		local ok, data = pcall(function() return HttpService:JSONDecode(raw) end)
 		if not ok or type(data) ~= "table" then return end
