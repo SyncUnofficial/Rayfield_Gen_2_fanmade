@@ -10,7 +10,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local useStudio = RunService:IsStudio()
 
-local fsAvailable = (writefile and readfile and isfile and isfolder and makefolder) and true or false
+local fsAvailable = writefile and readfile and isfile and isfolder and makefolder
 
 local function safeReadFile(path)
 	if not fsAvailable then return nil end
@@ -82,27 +82,29 @@ local function getGuiParent()
 	return LocalPlayer:WaitForChild("PlayerGui")
 end
 
+local rgb = Color3.fromRGB
+
 local Theme = {
-	Background       = Color3.fromRGB(20, 20, 20),
-	Card             = Color3.fromRGB(31, 31, 31),
-	CardHover        = Color3.fromRGB(39, 39, 39),
-	CardSelected     = Color3.fromRGB(48, 48, 48),
-	CardInset        = Color3.fromRGB(24, 24, 24),
-	SearchBox        = Color3.fromRGB(44, 44, 44),
-	Stroke           = Color3.fromRGB(255, 255, 255),
-	TextTitle        = Color3.fromRGB(247, 247, 247),
-	TextBody         = Color3.fromRGB(233, 233, 233),
-	TextSub          = Color3.fromRGB(152, 152, 152),
-	TextMuted        = Color3.fromRGB(110, 110, 110),
-	AccentDark       = Color3.fromRGB(54, 104, 80),
-	Accent           = Color3.fromRGB(70, 168, 120),
-	AccentSoft       = Color3.fromRGB(104, 210, 156),
-	Knob             = Color3.fromRGB(255, 255, 255),
-	KnobOff          = Color3.fromRGB(66, 68, 70),
-	ToggleTrack      = Color3.fromRGB(18, 18, 18),
-	BadgeBackground  = Color3.fromRGB(240, 166, 63),
-	BadgeText        = Color3.fromRGB(66, 45, 15),
-	NotifyBackground = Color3.fromRGB(16, 16, 16),
+	Background = rgb(20, 20, 20),
+	Card = rgb(31, 31, 31),
+	CardHover = rgb(39, 39, 39),
+	CardSelected = rgb(48, 48, 48),
+	CardInset = rgb(24, 24, 24),
+	SearchBox = rgb(44, 44, 44),
+	Stroke = rgb(255, 255, 255),
+	TextTitle = rgb(247, 247, 247),
+	TextBody = rgb(233, 233, 233),
+	TextSub = rgb(152, 152, 152),
+	TextMuted = rgb(110, 110, 110),
+	AccentDark = rgb(54, 104, 80),
+	Accent = rgb(70, 168, 120),
+	AccentSoft = rgb(104, 210, 156),
+	Knob = rgb(255, 255, 255),
+	KnobOff = rgb(66, 68, 70),
+	ToggleTrack = rgb(18, 18, 18),
+	BadgeBackground = rgb(240, 166, 63),
+	BadgeText = rgb(66, 45, 15),
+	NotifyBackground = rgb(16, 16, 16),
 }
 
 local painted = {}
@@ -146,39 +148,39 @@ local function create(class, props, children)
 	return inst
 end
 
-local function round(inst, radius)
-	return create("UICorner", {CornerRadius = UDim.new(0, radius), Parent = inst})
+local function round(inst, r)
+	return create("UICorner", {CornerRadius = UDim.new(0, r), Parent = inst})
 end
 
 local function roundFull(inst)
 	return create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = inst})
 end
 
-local function padAll(inst, top, right, bottom, left)
+local function padAll(inst, t, r, b, l)
 	return create("UIPadding", {
-		PaddingTop = UDim.new(0, top or 0),
-		PaddingRight = UDim.new(0, right or 0),
-		PaddingBottom = UDim.new(0, bottom or 0),
-		PaddingLeft = UDim.new(0, left or 0),
+		PaddingTop = UDim.new(0, t or 0),
+		PaddingRight = UDim.new(0, r or 0),
+		PaddingBottom = UDim.new(0, b or 0),
+		PaddingLeft = UDim.new(0, l or 0),
 		Parent = inst,
 	})
 end
 
-local GLOW_IMAGE = "rbxassetid://6014261993"
+local GLOW_IMAGE = 'rbxassetid://6014261993'
 
-local function softGlow(parent, color, transparency, spread, zindex)
+local function softGlow(parent, color, trans, spread, z)
 	return create("ImageLabel", {
-		Name = "Glow",
+		Name = 'Glow',
+		Image = GLOW_IMAGE,
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.new(1, spread, 1, spread),
-		Image = GLOW_IMAGE,
 		ImageColor3 = color,
-		ImageTransparency = transparency,
+		ImageTransparency = trans,
 		ScaleType = Enum.ScaleType.Slice,
 		SliceCenter = Rect.new(49, 49, 450, 450),
-		ZIndex = zindex or 0,
+		ZIndex = z or 0,
 		Parent = parent,
 	})
 end
@@ -201,8 +203,8 @@ local TI_SMOOTH = TweenInfo.new(0.32, Enum.EasingStyle.Exponential, Enum.EasingD
 local TI_MORPH = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local TI_SLOW = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
-local function tween(inst, info, props)
-	local t = TweenService:Create(inst, info, props)
+local function tween(o, ti, props)
+	local t = TweenService:Create(o, ti, props)
 	t:Play()
 	return t
 end
