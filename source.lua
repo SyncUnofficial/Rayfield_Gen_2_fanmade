@@ -74,6 +74,13 @@ local function httpGet(url)
 	if ok2 and type(result2) == "string" and #result2 > 0 then
 		return result2
 	end
+	-- in Studio there are no executor http functions, fall back to HttpService
+	local ok3, result3 = pcall(function()
+		return game:GetService("HttpService"):GetAsync(url)
+	end)
+	if ok3 and type(result3) == "string" and #result3 > 0 then
+		return result3
+	end
 	return nil
 end
 
