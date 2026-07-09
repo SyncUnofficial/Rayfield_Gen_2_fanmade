@@ -488,7 +488,7 @@ local function ensureRoot()
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -24, 1, -24),
-		Size = UDim2.fromOffset(330, 900),
+		Size = UDim2.fromOffset(320, 900),
 		Parent = rootGui,
 	})
 	create("UIListLayout", {
@@ -496,7 +496,7 @@ local function ensureRoot()
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
 		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 10),
+		Padding = UDim.new(0, 14),
 		Parent = notifyStack,
 	})
 	return rootGui
@@ -527,21 +527,22 @@ function RayfieldLibrary:Notify(data)
 		Size = UDim2.fromScale(1, 1),
 		Position = UDim2.fromOffset(370, 0),
 	})
-	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 38, 0)
+	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 22, 0)
 
 	-- CanvasGroups defer text layout, so AutomaticSize on wrapped labels reads a
 	-- stale TextBounds and clips the content. Measure the wrapped heights up front
 	-- and size the card, column and labels explicitly so long text always fits.
 	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
-	local NOTIFY_W, PAD_X, PAD_Y, ICON_BOX, TEXT_GAP = 330, 20, 18, 40, 58
+	-- compact card: tighter padding, smaller icon and text
+	local NOTIFY_W, PAD_X, PAD_Y, ICON_BOX, TEXT_GAP = 320, 15, 13, 32, 46
 	local textX = hasIcon and TEXT_GAP or 0
 	local textWidth = NOTIFY_W - PAD_X * 2 - textX
 
 	local titleText = data.Title or "Notification"
 	local bodyText = data.Content or ""
-	local titleH = measureWrapped(titleText, 17, FONT_BOLD, textWidth)
-	local bodyH = bodyText ~= "" and measureWrapped(bodyText, 15, FONT_MEDIUM, textWidth) or 0
-	local textColH = titleH + (bodyH > 0 and (4 + bodyH) or 0)
+	local titleH = measureWrapped(titleText, 15, FONT_BOLD, textWidth)
+	local bodyH = bodyText ~= "" and measureWrapped(bodyText, 14, FONT_MEDIUM, textWidth) or 0
+	local textColH = titleH + (bodyH > 0 and (3 + bodyH) or 0)
 	local contentH = math.max(hasIcon and ICON_BOX or 0, textColH)
 	local cardHeight = PAD_Y * 2 + contentH
 
@@ -550,8 +551,8 @@ function RayfieldLibrary:Notify(data)
 		GroupTransparency = 1,
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
-	-- flat matte black card, generous rounding, no top sheen (matches the target mock)
-	round(card, 22)
+	-- flat matte black card, no top sheen (matches the target mock)
+	round(card, 18)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.94, Parent = card})
 	padAll(card, PAD_Y, PAD_X, PAD_Y, PAD_X)
 
@@ -563,7 +564,7 @@ function RayfieldLibrary:Notify(data)
 			Size = UDim2.fromOffset(ICON_BOX, ICON_BOX),
 			Parent = card,
 		})
-		local icon = makeIcon(iconHolder, data.Image, 30, Theme.TextTitle)
+		local icon = makeIcon(iconHolder, data.Image, 24, Theme.TextTitle)
 		if icon then
 			icon.AnchorPoint = Vector2.new(0.5, 0.5)
 			icon.Position = UDim2.fromScale(0.5, 0.5)
@@ -581,14 +582,14 @@ function RayfieldLibrary:Notify(data)
 	create("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 4),
+		Padding = UDim.new(0, 3),
 		Parent = textCol,
 	})
 	create("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, titleH),
 		Font = FONT_BOLD,
-		TextSize = 17,
+		TextSize = 15,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
@@ -602,7 +603,7 @@ function RayfieldLibrary:Notify(data)
 			BackgroundTransparency = 1,
 			Size = UDim2.new(1, 0, 0, bodyH),
 			Font = FONT_MEDIUM,
-			TextSize = 15,
+			TextSize = 14,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
@@ -649,12 +650,10 @@ function RayfieldLibrary:Notify(data)
 	end)
 
 	task.defer(function()
-		local height = cardHeight
-		-- open the slot smoothly so the cards above slide up to make room, in
-		-- step with the new card sliding in from the right and fading in
-		wrapper.Size = UDim2.new(1, 0, 0, 0)
+		-- open the slot at full height right away so the card slides in fully
+		-- formed from the right instead of being revealed (and clipped) top down
+		wrapper.Size = UDim2.new(1, 0, 0, cardHeight)
 		holder.Position = UDim2.fromOffset(370, 0)
-		tween(wrapper, TI_MORPH, {Size = UDim2.new(1, 0, 0, height)})
 		tween(holder, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
 		tween(card, TI_MORPH, {GroupTransparency = 0})
 		tween(glow, TI_MORPH, {ImageTransparency = 0.6})
