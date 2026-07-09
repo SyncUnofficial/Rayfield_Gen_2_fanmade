@@ -1,20 +1,3 @@
---[[
-	Rayfield Gen 2 [fanmade]
-
-	Unofficial rebuild of the Rayfield Interface Suite with a new look.
-	Keeps the original Rayfield API so most existing scripts drop in:
-	CreateWindow, CreateTab, CreateSection, CreateButton, CreateToggle,
-	CreateSlider, CreateInput, CreateDropdown, CreateKeybind, CreateLabel,
-	CreateParagraph, CreateColorPicker, Notify, Flags, config saving,
-	key system, loading screen.
-
-	Gen 2 additions: header badge, search that filters elements, stat cards,
-	hide to pill animation, minimize to bar, sign in toast.
-
-	Original Rayfield by Sirius (sirius.menu). This project is not
-	affiliated with or endorsed by them.
-]]
-
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
@@ -24,8 +7,6 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-
--- executor environment shims
 
 local useStudio = RunService:IsStudio()
 
@@ -74,7 +55,7 @@ local function httpGet(url)
 	if ok2 and type(result2) == "string" and #result2 > 0 then
 		return result2
 	end
-	-- in Studio there are no executor http functions, fall back to HttpService
+
 	local ok3, result3 = pcall(function()
 		return game:GetService("HttpService"):GetAsync(url)
 	end)
@@ -100,8 +81,6 @@ local function getGuiParent()
 	if ok2 then return CoreGui end
 	return LocalPlayer:WaitForChild("PlayerGui")
 end
-
--- theme
 
 local Theme = {
 	Background       = Color3.fromRGB(20, 20, 20),
@@ -142,12 +121,9 @@ local function repaint()
 	end
 end
 
--- instance helpers
-
 local function create(class, props, children)
 	local inst = Instance.new(class)
-	-- kill Roblox's built in hover/press color modulation everywhere so
-	-- buttons never flash darker unless we animate them ourselves
+
 	if class == "TextButton" or class == "ImageButton" then
 		inst.AutoButtonColor = false
 	end
@@ -188,7 +164,6 @@ local function padAll(inst, top, right, bottom, left)
 	})
 end
 
--- soft blurred glow or shadow behind an element, 9 slice
 local GLOW_IMAGE = "rbxassetid://6014261993"
 
 local function softGlow(parent, color, transparency, spread, zindex)
@@ -240,8 +215,6 @@ local function measureText(text, size, font)
 	return Vector2.new(#text * size * 0.5, size)
 end
 
--- wrapped height for a fixed column width. used where AutomaticSize is unreliable,
--- e.g. text inside a CanvasGroup, so heights are computed up front instead
 local function measureWrapped(text, size, font, width)
 	local ok, result = pcall(function()
 		return TextService:GetTextSize(text, size, font, Vector2.new(width, 100000))
@@ -251,7 +224,6 @@ local function measureWrapped(text, size, font, width)
 	return math.ceil(#text / perLine) * (size + 3)
 end
 
--- pull the number out of a value string, keeping any prefix/suffix like "$" or "%"
 local function parseNumeric(s)
 	s = tostring(s)
 	local i, j = s:find("%-?%d[%d,]*%.?%d*")
@@ -268,8 +240,6 @@ local function addThousands(s)
 	return sign .. s
 end
 
--- returns setText(value): counts the label from its last number up or down to the
--- new one, keeping the prefix/suffix and decimals. non numeric values just set.
 local function countingValue(label, initial)
 	local token = 0
 	local current = initial ~= nil and parseNumeric(initial) or nil
@@ -315,19 +285,17 @@ local function countingValue(label, initial)
 	end
 end
 
--- odometer roll: overlays a value label with a row of clipped digit
--- strips and rolls each digit vertically to its target, ones place
--- settling last, like a slot machine / car odometer. non numeric
--- values fall back to plain text. drop in replacement for countingValue.
 local function odometerValue(label, initial)
 	label.TextTransparency = 1
 	local font, size, color = label.Font, label.TextSize, label.TextColor3
 	local cellH = TextService:GetTextSize("0", size, font, Vector2.new(2000, 2000)).Y
-	local digitW = 0
+
+	local digWidths, digitW = {}, 0
 	for d = 0, 9 do
-		digitW = math.max(digitW, TextService:GetTextSize(tostring(d), size, font, Vector2.new(2000, 2000)).X)
+		local w = math.ceil(TextService:GetTextSize(tostring(d), size, font, Vector2.new(2000, 2000)).X)
+		digWidths[d] = w
+		digitW = math.max(digitW, w)
 	end
-	digitW = math.ceil(digitW) + 1
 
 	local row = create("Frame", {
 		BackgroundTransparency = 1,
@@ -395,7 +363,7 @@ local function odometerValue(label, initial)
 				local targetD = tonumber(chr)
 				local cell = create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.fromOffset(digitW, cellH),
+					Size = UDim2.fromOffset(digWidths[targetD], cellH),
 					ClipsDescendants = true,
 					LayoutOrder = order,
 					ZIndex = row.ZIndex,
@@ -403,8 +371,9 @@ local function odometerValue(label, initial)
 				})
 				local strip = create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 10, 0),
-					Position = UDim2.fromOffset(0, -startD * cellH),
+					AnchorPoint = Vector2.new(0.5, 0),
+					Size = UDim2.fromOffset(digitW, 10 * cellH),
+					Position = UDim2.new(0.5, 0, 0, -startD * cellH),
 					ZIndex = row.ZIndex,
 					Parent = cell,
 				})
@@ -445,12 +414,12 @@ local function odometerValue(label, initial)
 		prevDigits = tDigits
 		local maxR = math.max(1, nT - 1)
 		for _, s in ipairs(strips) do
-			local dest = UDim2.fromOffset(0, -s.targetD * cellH)
+			local dest = UDim2.new(0.5, 0, 0, -s.targetD * cellH)
 			if animate == false or s.startD == s.targetD then
 				s.strip.Position = dest
 			else
 				local frac = s.posFromRight / maxR
-				local duration = 0.35 + 0.5 * (1 - frac)
+				local duration = 0.26 + 0.22 * (1 - frac)
 				tween(s.strip, TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = dest })
 			end
 		end
@@ -459,11 +428,6 @@ local function odometerValue(label, initial)
 	if initial ~= nil then setVal(initial, false) end
 	return setVal
 end
-
--- icons
--- lucide icons through the same generated index original Rayfield uses.
--- the index is an older lucide set, so newer names are mapped back through
--- aliases. the index is cached to disk so icons work offline after one run.
 
 local Icons = nil
 local pendingIcons = {}
@@ -525,10 +489,7 @@ local function getLucide(name)
 end
 
 local function loadIcons()
-	-- a bundled icon module wins over everything. this is how the index is
-	-- provided in Studio, where the client cannot run http or loadstring.
-	-- drop a ModuleScript named "RayfieldGen2Icons" that returns the index
-	-- next to the library and it is used with no network at all
+
 	local okMod, bundled = pcall(function()
 		local RS = game:GetService("ReplicatedStorage")
 		local iconMod = RS:FindFirstChild("RayfieldGen2Icons")
@@ -560,7 +521,7 @@ local function loadIcons()
 			safeWriteFile(cachePath, source)
 		end
 	elseif not fresh then
-		-- stale or corrupted cache, refetch once
+
 		source = httpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
 		if source then
 			local ok2, result2 = pcall(function()
@@ -610,8 +571,6 @@ if not Icons then
 	end)
 end
 
--- applies a lucide icon (accepts a list of candidate names) to an ImageLabel,
--- deferring until the index is available if needed
 local function applyLucide(img, names, onApplied)
 	if type(names) == "string" then names = {names} end
 	if Icons then
@@ -636,8 +595,6 @@ local function applyLucide(img, names, onApplied)
 	return false
 end
 
--- makes an ImageLabel for an icon which may be a lucide name, an asset id
--- number, or a full rbxassetid string
 local function makeIcon(parent, icon, size, color3, transparency)
 	if icon == nil or icon == 0 or icon == "" then return nil end
 	local img = create("ImageLabel", {
@@ -658,8 +615,6 @@ local function makeIcon(parent, icon, size, color3, transparency)
 	end
 	return img
 end
-
--- library
 
 local RayfieldLibrary = {
 	Flags = {},
@@ -691,7 +646,6 @@ local function ensureRoot()
 	end)
 	rootGui.Parent = getGuiParent()
 
-	-- bottom right stack, newest card at the bottom, older ones pushed up
 	notifyStack = create("Frame", {
 		Name = "Notifications",
 		BackgroundTransparency = 1,
@@ -711,8 +665,6 @@ local function ensureRoot()
 	return rootGui
 end
 
--- notifications
-
 local notifyOrder = 0
 
 function RayfieldLibrary:Notify(data)
@@ -720,8 +672,6 @@ function RayfieldLibrary:Notify(data)
 	ensureRoot()
 	notifyOrder = notifyOrder + 1
 
-	-- Rayfield Gen 1 style: 300 wide, icon 32 at x=20, text at x=70, the card
-	-- grows in height from collapsed while fading in (the fade masks the reveal)
 	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
 	local NOTIFY_W, ICON_BOX = 300, 32
 	local textX = hasIcon and 70 or 18
@@ -731,10 +681,9 @@ function RayfieldLibrary:Notify(data)
 	local bodyText = data.Content or ""
 	local titleH = measureWrapped(titleText, 16, FONT_BOLD, textWidth)
 	local bodyH = bodyText ~= "" and measureWrapped(bodyText, 15, FONT_MEDIUM, textWidth) or 0
-	-- height like Gen 1: title + body plus fixed top/bottom padding, minimum 60
+
 	local fullH = math.max(15 + titleH + (bodyH > 0 and (2 + bodyH) or 0) + 14, 60)
 
-	-- holder carries the drop shadow and drives the list reflow as it grows
 	local holder = create("Frame", {
 		Name = titleText,
 		BackgroundTransparency = 1,
@@ -744,7 +693,6 @@ function RayfieldLibrary:Notify(data)
 	})
 	local glow = softGlow(holder, Color3.fromRGB(0, 0, 0), 1, 18, 0)
 
-	-- flat matte black card, grows and fades as one piece
 	local card = create("CanvasGroup", {
 		Size = UDim2.fromScale(1, 1),
 		GroupTransparency = 1,
@@ -752,7 +700,7 @@ function RayfieldLibrary:Notify(data)
 		Parent = holder,
 	})
 	round(card, 20)
-	-- UIStroke on a CanvasGroup is not driven by GroupTransparency, so fade it by hand
+
 	local cardStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Parent = card})
 
 	if hasIcon then
@@ -811,7 +759,7 @@ function RayfieldLibrary:Notify(data)
 	local function dismiss()
 		if dismissed then return end
 		dismissed = true
-		-- fade out, then collapse the slot so the stack settles up into the gap
+
 		tween(card, FADE, {GroupTransparency = 1})
 		tween(cardStroke, FADE, {Transparency = 1})
 		tween(glow, FADE, {ImageTransparency = 1})
@@ -826,8 +774,7 @@ function RayfieldLibrary:Notify(data)
 	end)
 
 	task.defer(function()
-		-- grow the slot from collapsed to full height and widen from -60 to 0,
-		-- then fade the card in so it never looks hard cut (Rayfield Gen 1)
+
 		tween(holder, GROW, {Size = UDim2.new(1, 0, 0, fullH)})
 		task.wait(0.15)
 		tween(card, FADE, {GroupTransparency = 0})
@@ -835,7 +782,6 @@ function RayfieldLibrary:Notify(data)
 		task.wait(0.05)
 		tween(glow, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageTransparency = 0.72})
 
-		-- Gen 1 auto duration scales with content length when none is given
 		local duration = data.Duration or math.min(math.max(#bodyText * 0.1 + 2.5, 3), 10)
 		local elapsed = 0
 		while elapsed < duration and not dismissed do
@@ -845,8 +791,6 @@ function RayfieldLibrary:Notify(data)
 		dismiss()
 	end)
 end
-
--- sign in toast
 
 local function showAccountToast()
 	if not LocalPlayer then return end
@@ -933,8 +877,6 @@ local function showAccountToast()
 		wrapper:Destroy()
 	end)
 end
-
--- key system
 
 local function runKeySystem(Settings)
 	local keySettings = Settings.KeySettings or {}
@@ -1156,8 +1098,6 @@ local function runKeySystem(Settings)
 	return passed
 end
 
--- window
-
 function RayfieldLibrary:CreateWindow(Settings)
 	Settings = Settings or {}
 	ensureRoot()
@@ -1170,7 +1110,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end
 
-	-- configuration saving setup
 	local configEnabled = false
 	local configFolder = BASE_FOLDER
 	local configFile = "Config"
@@ -1206,7 +1145,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end)
 	end
 
-	-- sign in toast when the account changed since last run
 	task.spawn(function()
 		if not fsAvailable or not LocalPlayer then return end
 		local path = BASE_FOLDER .. "/lastuser.txt"
@@ -1223,7 +1161,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local HEADER_H = 76
 	local PILL_H = 62
 
-	-- pill width from the window name so long names fit
 	local pillNameText = Settings.Name or "Rayfield"
 	local pillTextW = math.max(
 		measureText(pillNameText, 16, FONT_BOLD).X,
@@ -1242,7 +1179,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = rootGui,
 	})
 
-	-- soft drop shadow that follows the window through every morph
 	local shadow = create("ImageLabel", {
 		Name = "Shadow",
 		BackgroundTransparency = 1,
@@ -1269,9 +1205,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 	})
 	paint(window, "BackgroundColor3", "Background")
 	local windowCorner = round(window, 24)
-	-- the stroke stays a faint hairline while the window is open, then it is
-	-- brightened in the hidden state so the pill matches the active tab pill.
-	-- the gradient gives it the same top lit falloff as those pills
+
 	local windowStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.93, Thickness = 1, Parent = window})
 	create("UIGradient", {
 		Rotation = 90,
@@ -1298,7 +1232,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = window,
 	})
 
-	-- drag handle line under the window
 	local handle = create("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, WINDOW_H + 12),
@@ -1315,7 +1248,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		shadow.Size = UDim2.fromOffset(size.X.Offset + 36, size.Y.Offset + 36)
 	end)
 
-	-- pill contents for the hidden state
 	local pillContent = create("CanvasGroup", {
 		Name = "PillContent",
 		BackgroundTransparency = 1,
@@ -1326,7 +1258,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = window,
 	})
 	do
-		-- just the icon on the pill, no circular well behind it
+
 		local placedIcon = makeIcon(pillContent, "eye", 30, Theme.TextTitle)
 		if placedIcon then
 			placedIcon.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1383,8 +1315,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		ZIndex = 12,
 		Parent = window,
 	})
-
-	-- header
 
 	local header = create("Frame", {
 		Name = "Header",
@@ -1470,7 +1400,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	})
 	paint(subtitleLabel, "TextColor3", "TextSub")
 
-	-- header buttons
 	local buttonRow = create("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0),
@@ -1519,8 +1448,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local minimizeButton, minimizeIcon = headerButton(3, {"minus"})
 	local closeButton = headerButton(4, {"x"})
 
-	-- body
-
 	local body = create("Frame", {
 		Name = "Body",
 		BackgroundTransparency = 1,
@@ -1547,14 +1474,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Padding = UDim.new(0, 8),
 		Parent = tabBar,
 	})
-	-- keep the pill strokes clear of the scrolling frame's clip edge
+
 	create("UIPadding", {
 		PaddingLeft = UDim.new(0, 2),
 		PaddingRight = UDim.new(0, 2),
 		Parent = tabBar,
 	})
 
-	-- search row between the tab bar and the pages
 	local searchHolder = create("Frame", {
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
@@ -1603,8 +1529,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		Parent = body,
 	})
 
-	-- window state
-
 	local Window = {}
 	local tabs = {}
 	local currentTab = nil
@@ -1617,7 +1541,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local storedPosition = nil
 	local unlockCursor = false
 
-	-- keeps the mouse usable in games that lock it to the camera
 	connect(RunService.RenderStepped, function()
 		if unlockCursor and not hidden and not destroyed then
 			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
@@ -1661,7 +1584,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				elseif structural then
 					item.Visible = false
 				elseif composite then
-					-- rows and columns match when any element inside matches
+
 					local matched = false
 					for _, d in ipairs(item:GetDescendants()) do
 						local sn = d:GetAttribute("SearchName")
@@ -1687,8 +1610,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		if not searchOpen then applySearchFilter("") end
 	end)
 
-	-- pages, each wrapped in a CanvasGroup so tab switches can fade
-
 	local function buildPage()
 		local pageWrapper = create("CanvasGroup", {
 			BackgroundTransparency = 1,
@@ -1697,7 +1618,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			Visible = false,
 			Parent = pagesHolder,
 		})
-		-- fades the content into the window at whichever edge has content past it
+
 		local fadeGrad = create("UIGradient", {
 			Rotation = 90,
 			Parent = pageWrapper,
@@ -1720,8 +1641,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		})
 		padAll(page, 2, 5, 16, 1)
 
-		-- only fade an edge when there is actually content scrolled past it, so a
-		-- resting element never dissolves; ramp over the first 24px of overflow
 		local EDGE = 0.05
 		local function updateFade()
 			local vh = page.AbsoluteWindowSize.Y
@@ -1787,8 +1706,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			applySearchFilter("")
 		end
 	end
-
-	-- element construction
 
 	local elementOrder = 0
 	local function nextOrder()
@@ -1877,11 +1794,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			tween(card, TI_FAST, {BackgroundColor3 = base or Theme.Card})
 		end)
 	end
-
-	-- Tab API
-	-- compact mode is used inside rows and columns: descriptions are
-	-- skipped, buttons center their content, sliders stack vertically and
-	-- stat cards use the small pill layout
 
 	local function buildTabAPI(page, compact)
 		local Tab = {}
@@ -2016,9 +1928,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return ParagraphValue
 		end
 
-		-- Gen2 stat card, the green gradient one. full width shows a big
-		-- value line, inside rows and columns it becomes a small pill with
-		-- the value on the right
 		function Tab:CreateStat(StatSettings)
 			StatSettings = StatSettings or {}
 			if compact then
@@ -2164,7 +2073,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			ButtonSettings = ButtonSettings or {}
 			local card, label
 			if compact then
-				-- centered icon and label for row and column cells
+
 				card = create("Frame", {
 					Size = UDim2.new(1, 0, 0, 50),
 					LayoutOrder = nextOrder(),
@@ -2235,8 +2144,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			descFor(card, ToggleSettings.Description)
 			hoverable(card)
 
-			-- wide flat track with a neutral ring. the track and ring never
-			-- change, only the knob turns green when on
 			local track = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -15, 0.5, 0),
@@ -2313,8 +2220,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local increment = SliderSettings.Increment or 1
 			local suffix = SliderSettings.Suffix or ""
 
-			-- full width cards put the track beside the labels, compact
-			-- cells stack the track under them like the two column mockup
 			local card = create("Frame", {
 				Size = UDim2.new(1, 0, 0, compact and 78 or 60),
 				LayoutOrder = nextOrder(),
@@ -2358,7 +2263,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			paint(valueLabel, "TextColor3", "TextSub")
 
-			-- slim dark track, the knob stands taller than it
 			local track
 			if compact then
 				track = create("Frame", {
@@ -2383,8 +2287,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = track,
 			})
 			roundFull(fill)
-			-- dark green fading into vivid green right at the knob, flat
-			-- with no bloom, crisp glowless white knob like the mock
+
 			create("UIGradient", {
 				Color = ColorSequence.new({
 					ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 88, 66)),
@@ -2422,9 +2325,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 				return text
 			end
 
-			-- the knob is centered on the end of the fill, so the bright
-			-- tip of the gradient tucks underneath it like the mockup.
-			-- the travel is inset so the knob never leaves the track
 			local function render(animate)
 				local alpha = 0
 				if range[2] ~= range[1] then
@@ -3192,9 +3092,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return ColorPicker
 		end
 
-		-- a horizontal strip of elements sharing the width equally.
-		-- returns a Tab style API in compact mode, so
-		-- local Row = Tab:CreateRow() then Row:CreateToggle({...})
 		function Tab:CreateRow()
 			local rowFrame = create("Frame", {
 				BackgroundTransparency = 1,
@@ -3229,9 +3126,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return buildTabAPI(rowFrame, true)
 		end
 
-		-- splits the page into vertical columns, each with the full element
-		-- API in compact mode:
-		-- local Left, Right = Tab:CreateColumns(2)
 		function Tab:CreateColumns(count)
 			count = math.clamp(count or 2, 1, 4)
 			local container = create("Frame", {
@@ -3273,8 +3167,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		return Tab
 	end
 
-	-- Window:CreateTab
-
 	function Window:CreateTab(tabName, tabImage, _ext)
 		local page, pageWrapper = buildPage()
 		local Tab = buildTabAPI(page)
@@ -3289,14 +3181,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 		})
 		pill.BackgroundColor3 = Theme.CardInset
 		roundFull(pill)
-		-- soft top light on the fill, the ring defines the shape in both states
+
 		create("UIGradient", {
 			Rotation = 90,
 			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
 			Parent = pill,
 		})
-		-- hairline rim light: 1px, brighter along the top edge, fading out
-		-- toward the bottom, like the reference
+
 		local pillStroke = create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.62, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = pill})
 		create("UIGradient", {
 			Rotation = 90,
@@ -3357,8 +3248,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		return Tab
 	end
 
-	-- settings page
-
 	local toggleKeyName = "K"
 	if Settings.ToggleUIKeybind then
 		if typeof(Settings.ToggleUIKeybind) == "EnumItem" then
@@ -3418,8 +3307,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end)
 
-	-- dragging with a smooth tween follow, like original Rayfield
-
 	local function makeDraggable(zone)
 		local dragging = false
 		local dragStart = nil
@@ -3452,8 +3339,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	makeDraggable(header)
 	makeDraggable(handle)
 
-	-- minimize and hide
-
 	local function setMinimizeIcon(restore)
 		applyLucide(minimizeIcon, restore and {"maximize-2", "expand"} or {"minus"})
 	end
@@ -3469,10 +3354,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		setMinimized(not minimized)
 	end)
 
-	-- hide and show, matching the Gen2 morph animation:
-	-- content fades, the frame flies to the top center while shrinking into
-	-- a pill, then the pill content fades in. showing reverses it.
-
 	local function hideWindow()
 		if morphing or hidden then return end
 		morphing = true
@@ -3484,7 +3365,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		main.Visible = false
 		tween(windowCorner, TI_MORPH, {CornerRadius = UDim.new(0, math.floor(PILL_H / 2))})
 		tween(window, TI_MORPH, {Size = UDim2.fromOffset(PILL_W, PILL_H)})
-		-- adopt the active tab pill look: lighter fill, brighter hairline ring
+
 		tween(window, TI_MORPH, {BackgroundColor3 = Color3.fromRGB(46, 46, 46)})
 		tween(windowStroke, TI_MORPH, {Transparency = 0.45})
 		tween(shadow, TI_MORPH, {ImageTransparency = 0.55})
@@ -3539,8 +3420,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	RayfieldLibrary._showWindow = showWindow
 	RayfieldLibrary._isHidden = function() return hidden end
 
-	-- Window API
-
 	function Window.ModifyTheme(newTheme)
 		if type(newTheme) == "table" then
 			for k, v in pairs(newTheme) do
@@ -3560,13 +3439,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 		subtitleLabel.Text = newSubtitle or subtitleLabel.Text
 	end
 
-	-- entrance, with an optional loading card that expands into the window
-
 	local hasLoading = (Settings.LoadingTitle and Settings.LoadingTitle ~= "") or (Settings.LoadingSubtitle and Settings.LoadingSubtitle ~= "")
 
 	if hasLoading then
-		-- block hide and minimize until the loading card has expanded,
-		-- otherwise the delayed expansion would fight the pill morph
+
 		morphing = true
 		local LOAD_W, LOAD_H = 320, 140
 		window.Size = UDim2.fromOffset(LOAD_W, LOAD_H)
@@ -3645,8 +3521,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 		tween(handle, TI_SLOW, {BackgroundTransparency = 0.35})
 	end
 
-	-- config load
-
 	function RayfieldLibrary:LoadConfiguration()
 		if not configEnabled then return end
 		local raw = safeReadFile(configFolder .. "/" .. configFile .. ".json")
@@ -3670,8 +3544,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	return Window
 end
-
--- visibility and teardown
 
 function RayfieldLibrary:IsVisible()
 	if RayfieldLibrary._isHidden then

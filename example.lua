@@ -1,6 +1,3 @@
--- Rayfield Gen 2 [fanmade] example
--- loads the library and builds a demo window with every element
-
 local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/SyncOfficialSpec/Rayfield_Gen_2_fanmade/main/source.lua"))()
 
 local Window = Rayfield:CreateWindow({
