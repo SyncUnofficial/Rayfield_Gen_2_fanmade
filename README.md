@@ -14,19 +14,6 @@ local Rayfield = loadstring(game:HttpGet(
 
 There's a full demo in `example.lua` with every element in it.
 
-## What's different
-
-* dark gradient window with a soft shadow, pill tabs, iOS style toggles, gradient sliders
-* closing doesn't kill the UI. the window morphs into a small "Tap to show" pill at the top of the screen. the dash minimizes into the title bar instead
-* stat cards for currency and similar values. when the number changes it rolls like an odometer instead of just swapping
-* rows and columns, so elements can sit side by side or in two column pages
-* search icon in the header filters whatever tab you're on
-* notifications stack bottom right, size themselves to their text, pause while hovered, click to dismiss early
-* dragging follows the cursor with a tween instead of snapping
-* toast when you play on a different account than last run
-* badge pill in the header, useful for region or language tags
-* key system. saved keys and fetching the key from a site both work
-
 ## Creating a window
 
 ```lua
