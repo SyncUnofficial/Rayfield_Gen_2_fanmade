@@ -523,14 +523,10 @@ function RayfieldLibrary:Notify(data)
 		GroupTransparency = 1,
 		BackgroundColor3 = Theme.NotifyBackground,
 	})
-	round(card, 18)
-	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.92, Parent = card})
-	create("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(170, 170, 170)),
-		Parent = card,
-	})
-	padAll(card, 15, 18, 15, 16)
+	-- flat matte black card, generous rounding, no top sheen (matches the target mock)
+	round(card, 22)
+	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.94, Parent = card})
+	padAll(card, 18, 20, 18, 20)
 
 	local hasIcon = data.Image ~= nil and data.Image ~= "" and data.Image ~= 0
 	if hasIcon then
@@ -538,10 +534,10 @@ function RayfieldLibrary:Notify(data)
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 0, 0.5, 0),
-			Size = UDim2.fromOffset(38, 38),
+			Size = UDim2.fromOffset(40, 40),
 			Parent = card,
 		})
-		local icon = makeIcon(iconHolder, data.Image, 27, Theme.TextTitle)
+		local icon = makeIcon(iconHolder, data.Image, 30, Theme.TextTitle)
 		if icon then
 			icon.AnchorPoint = Vector2.new(0.5, 0.5)
 			icon.Position = UDim2.fromScale(0.5, 0.5)
@@ -551,14 +547,14 @@ function RayfieldLibrary:Notify(data)
 	local textCol = create("Frame", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.Y,
-		Position = UDim2.fromOffset(hasIcon and 52 or 2, 0),
-		Size = UDim2.new(1, hasIcon and -52 or -2, 0, 0),
+		Position = UDim2.fromOffset(hasIcon and 58 or 0, 0),
+		Size = UDim2.new(1, hasIcon and -58 or 0, 0, 0),
 		Parent = card,
 	})
 	create("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 3),
+		Padding = UDim.new(0, 4),
 		Parent = textCol,
 	})
 	create("TextLabel", {
@@ -626,8 +622,11 @@ function RayfieldLibrary:Notify(data)
 	task.defer(function()
 		task.wait()
 		local height = card.AbsoluteSize.Y
-		wrapper.Size = UDim2.new(1, 0, 0, height)
+		-- open the slot smoothly so the cards above slide up to make room, in
+		-- step with the new card sliding in from the right and fading in
+		wrapper.Size = UDim2.new(1, 0, 0, 0)
 		holder.Position = UDim2.fromOffset(370, 0)
+		tween(wrapper, TI_MORPH, {Size = UDim2.new(1, 0, 0, height)})
 		tween(holder, TI_MORPH, {Position = UDim2.fromOffset(0, 0)})
 		tween(card, TI_MORPH, {GroupTransparency = 0})
 		tween(glow, TI_MORPH, {ImageTransparency = 0.6})

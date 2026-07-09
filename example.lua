@@ -79,7 +79,19 @@ Home:CreateButton({
 			Title = "Longer notification",
 			Content = "This one has a lot more text so you can check that the card grows to fit the content, wraps every line properly, and still slides in and out from the right side smoothly.",
 			Duration = 8,
-			Image = "messages-square",
+			Image = "chart-no-axes-column",
+		})
+	end,
+})
+
+Home:CreateButton({
+	Name = "Send Without Icon",
+	Icon = "bell",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "No icon here",
+			Content = "Notifications work fine without an icon too, and the text column stretches to fill the width.",
+			Duration = 6,
 		})
 	end,
 })
