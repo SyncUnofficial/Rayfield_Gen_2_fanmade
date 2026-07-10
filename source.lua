@@ -2391,9 +2391,20 @@ function RayfieldLibrary:CreateWindow(Settings)
 					end
 					local dx = rxs[i + 1] - rxs[i]
 					local dy = rys[i + 1] - rys[i]
+					local len = math.max(math.sqrt(dx * dx + dy * dy), 0.001)
+					local ov = smooth and 3 or 4
+					local cxx, cyy = rxs[i] + dx / 2, rys[i] + dy / 2
+					if rn == 2 then
+						ov = 0
+					elseif i == 1 or i == rn - 1 then
+						local push = (i == 1 and ov or -ov) / 4
+						cxx = cxx + dx / len * push
+						cyy = cyy + dy / len * push
+						ov = ov / 2
+					end
 					local props = {
-						Position = UDim2.fromScale((rxs[i] + dx / 2) / w, (rys[i] + dy / 2) / h),
-						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + (smooth and 3 or 4), 3),
+						Position = UDim2.fromScale(cxx / w, cyy / h),
+						Size = UDim2.fromOffset(math.ceil(len + ov), 3),
 						Rotation = math.deg(math.atan2(dy, dx)),
 					}
 					if animate and not fresh then
@@ -2408,7 +2419,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				if filled then
 					local colW = 3
 					local fillX = rxs[1]
-					local count = math.floor((rxs[rn] - fillX) / colW)
+					local count = math.max(math.ceil((rxs[rn] - fillX) / colW), 1)
 					for i = #cols, count + 1, -1 do
 						cols[i]:Destroy()
 						cols[i] = nil
@@ -2432,14 +2443,16 @@ function RayfieldLibrary:CreateWindow(Settings)
 							})
 							cols[c] = f
 						end
-						local cx = fillX + (c - 0.5) * colW
+						local left = fillX + (c - 1) * colW
+						local cw = math.min(colW, rxs[rn] - left)
+						local cx = left + cw / 2
 						while seg < rn - 1 and rxs[seg + 1] < cx do seg = seg + 1 end
 						local x1, x2 = rxs[seg], rxs[seg + 1]
 						local a = math.clamp((cx - x1) / math.max(x2 - x1, 1), 0, 1)
 						local y = rys[seg] + (rys[seg + 1] - rys[seg]) * a
 						local props = {
-							Position = UDim2.fromOffset(fillX + (c - 1) * colW, h - 1),
-							Size = UDim2.fromOffset(colW, math.max(h - 1 - y, 0)),
+							Position = UDim2.fromOffset(left, h - 1),
+							Size = UDim2.fromOffset(math.max(cw, 1), math.max(h - 1 - y, 0)),
 						}
 						colTargets[c] = props.Size
 						if animate and not fresh then
