@@ -2304,7 +2304,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local range = hi - lo
 				if range == 0 then range = math.max(math.abs(hi), 1) end
 				for i = 1, n do
-					xsCache[i] = math.floor((i - 1) / (n - 1) * (w - 10) + 5.5)
+					xsCache[i] = (i - 1) / (n - 1) * w
 					ysCache[i] = math.floor(10 + (1 - (points[i] - lo) / range) * (h - 22) + 0.5)
 				end
 				for i = #xsCache, n + 1, -1 do
