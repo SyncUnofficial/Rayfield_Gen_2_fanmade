@@ -109,6 +109,33 @@ Home:CreateButton({
 	end,
 })
 
+Home:CreateSection("FAQ")
+
+Home:CreateFAQ({
+	Items = {
+		{
+			Question = "Why was this fanmade Gen 2 created?",
+			Answer = "So people can experience a Gen 2 style Rayfield right now instead of waiting for the official release. It is a fan project built from zero, not a replacement for the real thing.",
+		},
+		{
+			Question = "Will my existing Rayfield scripts work?",
+			Answer = "Yes. Gen 2 keeps the original Rayfield API, so most scripts load without any changes. Swap the loadstring URL and your window, tabs and elements come up in the new look.",
+		},
+		{
+			Question = "Is this affiliated with Sirius?",
+			Answer = "No. This is an unofficial fan remake and has no connection to Sirius or the actual Rayfield developers. The real Rayfield lives at docs.sirius.menu.",
+		},
+		{
+			Question = "Where do I report bugs or suggest features?",
+			Answer = "There is no formal bug tracker or update roadmap. This is a fanmade build whose only goal is to let people experience Gen 2 before the official release, so ongoing updates are not planned. If you still want to share a problem or an idea, the Discord server is the place: https://discord.gg/hXtTC9SVfX",
+		},
+		{
+			Question = "How can I connect with the creator?",
+			Answer = "Join the Discord server at https://discord.gg/hXtTC9SVfX. That is the one place to reach me, whether it is feedback, questions or just to hang out.",
+		},
+	},
+})
+
 Home:CreateSection("Interface")
 
 Home:CreateToggle({

@@ -115,6 +115,19 @@ Tab:CreateColorPicker({
 })
 ```
 
+### FAQ
+
+Accordion cards. Click a question and the card expands with the answer, the plus spins into a close mark. Opening one closes the others, click again to collapse.
+
+```lua
+Tab:CreateFAQ({
+	Items = {
+		{Question = "Why was this created?", Answer = "So people can try a Gen 2 style Rayfield before the official release."},
+		{Question = "Will my scripts work?", Answer = "Yes, the API matches original Rayfield."},
+	},
+})
+```
+
 ### Stat cards
 
 ```lua

@@ -1937,6 +1937,91 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return ParagraphValue
 		end
 
+		function Tab:CreateFAQ(FAQSettings)
+			FAQSettings = FAQSettings or {}
+			local FAQValue = {Items = {}}
+			local closers = {}
+			for _, item in ipairs(FAQSettings.Items or {}) do
+				local question = item.Question or ""
+				local answer = item.Answer or ""
+				local card = create("Frame", {
+					Size = UDim2.new(1, 0, 0, 54),
+					LayoutOrder = nextOrder(),
+					ClipsDescendants = true,
+					Parent = page,
+				})
+				card:SetAttribute("SearchName", question .. " " .. answer)
+				paint(card, "BackgroundColor3", "Card")
+				cardBase(card)
+				hoverable(card)
+				local qLabel = create("TextLabel", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(17, 0),
+					Size = UDim2.new(1, -60, 0, 54),
+					Font = FONT_MEDIUM,
+					TextSize = 15,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					Text = question,
+					Parent = card,
+				})
+				paint(qLabel, "TextColor3", "TextTitle")
+				local plus = makeIcon(card, "plus", 16, Theme.TextSub, 0.15)
+				plus.AnchorPoint = Vector2.new(1, 0.5)
+				plus.Position = UDim2.new(1, -16, 0, 27)
+				local aLabel = create("TextLabel", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(17, 54),
+					Size = UDim2.new(1, -34, 0, 0),
+					Font = FONT_REGULAR,
+					TextSize = 14,
+					TextWrapped = true,
+					TextTransparency = 1,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					Text = answer,
+					Parent = card,
+				})
+				paint(aLabel, "TextColor3", "TextSub")
+				local open = false
+				local function setOpen(state)
+					if open == state then return end
+					open = state
+					if open then
+						local ah = measureWrapped(answer, 14, FONT_REGULAR, math.max(card.AbsoluteSize.X - 40, 50))
+						aLabel.Size = UDim2.new(1, -34, 0, ah + 4)
+						aLabel.Position = UDim2.fromOffset(17, 58)
+						tween(card, TI_MORPH, {Size = UDim2.new(1, 0, 0, 54 + ah + 16)})
+						tween(plus, TI_MORPH, {Rotation = 135, ImageColor3 = Theme.AccentSoft, ImageTransparency = 0})
+						tween(aLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0.1), {TextTransparency = 0.1, Position = UDim2.fromOffset(17, 50)})
+					else
+						tween(card, TI_MORPH, {Size = UDim2.new(1, 0, 0, 54)})
+						tween(plus, TI_MORPH, {Rotation = 0, ImageColor3 = Theme.TextSub, ImageTransparency = 0.15})
+						tween(aLabel, TI_FAST, {TextTransparency = 1})
+					end
+				end
+				closers[#closers + 1] = function() setOpen(false) end
+				local function openExclusive()
+					for _, c in ipairs(closers) do c() end
+					setOpen(true)
+				end
+				local clicker = create("TextButton", {
+					BackgroundTransparency = 1,
+					Text = "",
+					Size = UDim2.fromScale(1, 1),
+					Parent = card,
+				})
+				clicker.MouseButton1Click:Connect(function()
+					if open then setOpen(false) else openExclusive() end
+				end)
+				FAQValue.Items[#FAQValue.Items + 1] = {
+					Open = openExclusive,
+					Close = function() setOpen(false) end,
+				}
+			end
+			return FAQValue
+		end
+
 		function Tab:CreateStat(StatSettings)
 			StatSettings = StatSettings or {}
 			if compact then
