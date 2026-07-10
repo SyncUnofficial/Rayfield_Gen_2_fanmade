@@ -2178,6 +2178,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local decimals = ChartSettings.Decimals or 0
 			local filled = ChartSettings.Filled ~= false
 			local smooth = ChartSettings.Smooth == true
+			local showDots = ChartSettings.Dots == true or (ChartSettings.Dots == nil and not smooth)
 			local maxPoints = ChartSettings.MaxPoints or math.max(#points, 12)
 
 			local cardH = compact and 118 or 152
@@ -2316,8 +2317,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 						local x2, y2 = xsCache[i + 1], ysCache[i + 1]
 						local x3 = xsCache[i + 2] or x2
 						local y3 = ysCache[i + 2] or y2
-						for tstep = 0, 5 do
-							local a = tstep / 6
+						for tstep = 0, 9 do
+							local a = tstep / 10
 							rxs[#rxs + 1] = catmull(x0, x1, x2, x3, a)
 							rys[#rys + 1] = math.clamp(catmull(y0, y1, y2, y3, a), 2, h - 2)
 						end
@@ -2348,6 +2349,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 						})
 						paint(d, "BackgroundColor3", "Knob")
 						roundFull(d)
+						d.Visible = showDots
 						dots[i] = d
 					end
 					local target = UDim2.fromOffset(xsCache[i], ysCache[i])
@@ -2384,7 +2386,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					local dy = rys[i + 1] - rys[i]
 					local props = {
 						Position = UDim2.fromOffset(rxs[i] + dx / 2, rys[i] + dy / 2),
-						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + 2, 3),
+						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + 3, 3),
 						Rotation = math.deg(math.atan2(dy, dx)),
 					}
 					if animate and not fresh then
@@ -2397,7 +2399,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 
 				if filled then
-					local colW = 4
+					local colW = 3
 					local count = math.floor(w / colW)
 					for i = #cols, count + 1, -1 do
 						cols[i]:Destroy()
@@ -2447,12 +2449,14 @@ function RayfieldLibrary:CreateWindow(Settings)
 				if hoverIdx and dots[hoverIdx] then
 					dots[hoverIdx].Size = UDim2.fromOffset(10, 10)
 					dots[hoverIdx].BackgroundColor3 = Theme.Knob
+					dots[hoverIdx].Visible = showDots
 				end
 				hoverIdx = i
 				local d = i and dots[i]
 				if d then
 					d.Size = UDim2.fromOffset(14, 14)
 					d.BackgroundColor3 = Theme.AccentSoft
+					d.Visible = true
 					hairline.Position = UDim2.fromOffset(xsCache[i], 0)
 					hairline.Visible = true
 					setValue(fmt(points[i]))
@@ -2497,6 +2501,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					end
 				end)
 				for i, d in ipairs(dots) do
+					if not showDots then break end
 					d.Size = UDim2.fromOffset(0, 0)
 					local at = math.clamp((xsCache[i] or 0) / w, 0, 1)
 					task.delay(at * D * 0.62, function()
@@ -2507,7 +2512,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				for c, f in ipairs(cols) do
 					local target = colTargets[c] or f.Size
 					f.Size = UDim2.fromOffset(target.X.Offset, 0)
-					local at = math.clamp(((c - 0.5) * 4) / w, 0, 1)
+					local at = math.clamp(((c - 0.5) * 3) / w, 0, 1)
 					task.delay(at * D * 0.62 + 0.05, function()
 						if my ~= animToken then return end
 						tween(f, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = target})
@@ -2842,27 +2847,50 @@ function RayfieldLibrary:CreateWindow(Settings)
 			end
 			local slices = parseSlices(ChartSettings.Slices)
 
-			local card, nameLabel, valueLabel = chartShell(ChartSettings, 176)
-			local R = 56
-			local pcx, pcy = 17 + R + 4, 44 + R + 6
+			local card, nameLabel, valueLabel = chartShell(ChartSettings, 188)
+			local R = 62
+			local HOLE = 33
+			local pcx, pcy = 17 + R + 4, 48 + R + 6
 			local disc = create("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 				Parent = card,
 			})
-			local RAYS = 90
+			local RAYS = 140
 			local rays, rayslice = {}, {}
 			for r = 1, RAYS do
 				rays[r] = create("Frame", {
 					AnchorPoint = Vector2.new(0.5, 1),
 					Position = UDim2.fromOffset(pcx, pcy),
-					Size = UDim2.fromOffset(7, R),
+					Size = UDim2.fromOffset(5, R),
 					Rotation = (r - 0.5) * (360 / RAYS),
 					BorderSizePixel = 0,
 					ZIndex = 2,
 					Parent = disc,
 				})
 			end
+			local hole = create("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(pcx, pcy),
+				Size = UDim2.fromOffset(HOLE * 2, HOLE * 2),
+				BorderSizePixel = 0,
+				ZIndex = 3,
+				Parent = disc,
+			})
+			paint(hole, "BackgroundColor3", "Card")
+			roundFull(hole)
+			local centerLabel = create("TextLabel", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(pcx, pcy),
+				Size = UDim2.fromOffset(58, 16),
+				Font = FONT_BOLD,
+				TextSize = 14,
+				Text = "",
+				ZIndex = 4,
+				Parent = disc,
+			})
+			paint(centerLabel, "TextColor3", "TextTitle")
 			local legend = create("Frame", {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromOffset(pcx + R + 24, 52),
@@ -2968,9 +2996,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 						if rayslice[r] == si then rays[r].BackgroundColor3 = lit end
 					end
 					if legendNames[si] then legendNames[si].TextColor3 = Color3.fromRGB(255, 255, 255) end
-					valueLabel.Text = pct(slices[si].value)
+					centerLabel.Text = pct(slices[si].value)
 				else
-					valueLabel.Text = ""
+					centerLabel.Text = ""
 				end
 			end
 
@@ -2978,7 +3006,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
 				local dx = input.Position.X - (card.AbsolutePosition.X + pcx)
 				local dy = input.Position.Y - (card.AbsolutePosition.Y + pcy)
-				if dx * dx + dy * dy > R * R then
+				local dist = dx * dx + dy * dy
+				if dist > R * R or dist < HOLE * HOLE then
 					applyHover(nil)
 					return
 				end
@@ -3313,16 +3342,74 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local sets = parseSets(ChartSettings.Sets)
 			local maxV = tonumber(ChartSettings.Max)
 
-			local card, nameLabel, valueLabel = chartShell(ChartSettings, 250)
+			local card, nameLabel, valueLabel = chartShell(ChartSettings, 286)
+			local legend = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(17, 40),
+				Size = UDim2.new(1, -34, 0, 18),
+				Parent = card,
+			})
+			create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 14),
+				Parent = legend,
+			})
+			local function rebuildLegend()
+				for _, ch in ipairs(legend:GetChildren()) do
+					if ch:IsA("Frame") then ch:Destroy() end
+				end
+				for i, s in ipairs(sets) do
+					if s.name ~= "" then
+						local item = create("Frame", {
+							BackgroundTransparency = 1,
+							AutomaticSize = Enum.AutomaticSize.X,
+							Size = UDim2.new(0, 0, 1, 0),
+							LayoutOrder = i,
+							Parent = legend,
+						})
+						local chip = create("Frame", {
+							AnchorPoint = Vector2.new(0, 0.5),
+							Position = UDim2.new(0, 0, 0.5, 0),
+							Size = UDim2.fromOffset(10, 10),
+							BackgroundColor3 = s.color,
+							BorderSizePixel = 0,
+							Parent = item,
+						})
+						roundFull(chip)
+						local nm = create("TextLabel", {
+							BackgroundTransparency = 1,
+							AutomaticSize = Enum.AutomaticSize.X,
+							AnchorPoint = Vector2.new(0, 0.5),
+							Position = UDim2.new(0, 16, 0.5, 0),
+							Size = UDim2.new(0, 0, 0, 14),
+							Font = FONT_MEDIUM,
+							TextSize = 13,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							Text = s.name,
+							Parent = item,
+						})
+						paint(nm, "TextColor3", "TextSub")
+					end
+				end
+			end
+			rebuildLegend()
+
 			local plot = create("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(17, 44),
-				Size = UDim2.new(1, -34, 1, -58),
+				Position = UDim2.fromOffset(17, 62),
+				Size = UDim2.new(1, -34, 1, -76),
 				Parent = card,
 			})
 			local webHolder = create("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
+				Parent = plot,
+			})
+			local fillHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 2,
 				Parent = plot,
 			})
 			local setHolder = create("Frame", {
@@ -3333,19 +3420,25 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			local setFrames = {}
 
+			local function geom(w, h)
+				local R = math.min(h / 2 - 22, 86)
+				return w / 2, h / 2 + 2, R
+			end
 			local function axisPoint(k, frac, w, h)
+				local cx, cy, R = geom(w, h)
 				local ang = math.rad((k - 1) / #axes * 360 - 90)
-				local R = math.min(h / 2 - 24, 78)
-				local cx, cy = w / 2, h / 2 + 4
 				return cx + math.cos(ang) * R * frac, cy + math.sin(ang) * R * frac
 			end
 
+			local FILLRAYS = 72
 			local function redraw()
 				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
 				if w < 40 or h < 40 then return end
 				for _, ch in ipairs(webHolder:GetChildren()) do ch:Destroy() end
+				for _, ch in ipairs(fillHolder:GetChildren()) do ch:Destroy() end
 				for _, ch in ipairs(setHolder:GetChildren()) do ch:Destroy() end
 				setFrames = {}
+				local cx, cy = geom(w, h)
 				local hi = maxV
 				if not hi then
 					hi = 1
@@ -3353,56 +3446,84 @@ function RayfieldLibrary:CreateWindow(Settings)
 						for _, v in ipairs(s.values) do hi = math.max(hi, v) end
 					end
 				end
-				for _, ringFrac in ipairs({1 / 3, 2 / 3, 1}) do
+				for _, ringFrac in ipairs({0.25, 0.5, 0.75, 1}) do
 					for k = 1, #axes do
 						local x1, y1 = axisPoint(k, ringFrac, w, h)
 						local x2, y2 = axisPoint(k % #axes + 1, ringFrac, w, h)
 						local sg = lineSeg(webHolder, x1, y1, x2, y2, 1, 1)
 						sg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-						sg.BackgroundTransparency = 0.92
+						sg.BackgroundTransparency = ringFrac == 1 and 0.86 or 0.92
 					end
 				end
 				for k = 1, #axes do
-					local cx, cy = axisPoint(k, 0, w, h)
 					local x2, y2 = axisPoint(k, 1, w, h)
 					local sg = lineSeg(webHolder, cx, cy, x2, y2, 1, 1)
 					sg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					sg.BackgroundTransparency = 0.94
-					local lx, ly = axisPoint(k, 1.28, w, h)
+					sg.BackgroundTransparency = 0.93
+					local lx, ly = axisPoint(k, 1.24, w, h)
 					local lab = create("TextLabel", {
 						BackgroundTransparency = 1,
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromOffset(math.clamp(lx, 40, w - 40), ly),
-						Size = UDim2.fromOffset(88, 12),
+						Position = UDim2.fromOffset(math.clamp(lx, 46, w - 46), ly),
+						Size = UDim2.fromOffset(92, 13),
 						Font = FONT_MEDIUM,
-						TextSize = 11,
+						TextSize = 12,
 						TextTruncate = Enum.TextTruncate.AtEnd,
 						Text = axes[k],
 						Parent = webHolder,
 					})
-					paint(lab, "TextColor3", "TextMuted")
+					paint(lab, "TextColor3", "TextSub")
 				end
 				for si, s in ipairs(sets) do
-					local frames = {segs = {}, dots = {}}
+					local frames = {segs = {}, dots = {}, fill = {}}
 					local pts = {}
 					for k = 1, #axes do
 						local frac = math.clamp(s.values[k] / hi, 0, 1)
 						local x, y = axisPoint(k, frac, w, h)
 						pts[k] = {x, y}
 					end
+					local sector = 360 / #axes
+					for r = 1, FILLRAYS do
+						local aDeg = (r - 0.5) * (360 / FILLRAYS)
+						local k = math.min(math.floor(aDeg / sector) + 1, #axes)
+						local p1 = pts[k]
+						local p2 = pts[k % #axes + 1]
+						local rad = math.rad(aDeg - 90)
+						local dxr, dyr = math.cos(rad), math.sin(rad)
+						local ex, ey = p2[1] - p1[1], p2[2] - p1[2]
+						local denom = dxr * ey - dyr * ex
+						local len = 0
+						if math.abs(denom) > 0.0001 then
+							len = ((p1[1] - cx) * ey - (p1[2] - cy) * ex) / denom
+						end
+						len = math.max(len, 0)
+						if len > 1 then
+							local rayf = create("Frame", {
+								AnchorPoint = Vector2.new(0.5, 1),
+								Position = UDim2.fromOffset(cx, cy),
+								Size = UDim2.fromOffset(7, math.floor(len + 0.5)),
+								Rotation = aDeg,
+								BackgroundColor3 = s.color,
+								BackgroundTransparency = 0.86,
+								BorderSizePixel = 0,
+								ZIndex = 2,
+								Parent = fillHolder,
+							})
+							frames.fill[#frames.fill + 1] = rayf
+						end
+					end
 					for k = 1, #axes do
 						local a = pts[k]
 						local b = pts[k % #axes + 1]
 						local sg = lineSeg(setHolder, a[1], a[2], b[1], b[2], 2, 3)
 						sg.BackgroundColor3 = s.color
-						sg.BackgroundTransparency = 0.1
 						frames.segs[k] = sg
 					end
 					for k = 1, #axes do
 						local dt = create("Frame", {
 							AnchorPoint = Vector2.new(0.5, 0.5),
 							Position = UDim2.fromOffset(pts[k][1], pts[k][2]),
-							Size = UDim2.fromOffset(6, 6),
+							Size = UDim2.fromOffset(7, 7),
 							BackgroundColor3 = s.color,
 							BorderSizePixel = 0,
 							ZIndex = 4,
@@ -3422,18 +3543,25 @@ function RayfieldLibrary:CreateWindow(Settings)
 				local my = animToken
 				for si, frames in ipairs(setFrames) do
 					local at = (si - 1) * 0.18
+					for _, rayf in ipairs(frames.fill) do
+						rayf.BackgroundTransparency = 1
+						task.delay(at + 0.1, function()
+							if my ~= animToken then return end
+							tween(rayf, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.86})
+						end)
+					end
 					for _, sg in ipairs(frames.segs) do
 						sg.BackgroundTransparency = 1
 						task.delay(at, function()
 							if my ~= animToken then return end
-							tween(sg, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1})
+							tween(sg, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
 						end)
 					end
 					for k, dt in ipairs(frames.dots) do
 						dt.Size = UDim2.fromOffset(0, 0)
 						task.delay(at + 0.08 + k * 0.04, function()
 							if my ~= animToken then return end
-							tween(dt, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(6, 6)})
+							tween(dt, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(7, 7)})
 						end)
 					end
 				end
@@ -3460,7 +3588,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 					if #axes < 3 then axes = {"A", "B", "C"} end
 				end
 				if newSettings.Max then maxV = tonumber(newSettings.Max) end
-				if newSettings.Sets then sets = parseSets(newSettings.Sets) end
+				if newSettings.Sets then
+					sets = parseSets(newSettings.Sets)
+					rebuildLegend()
+				end
 				redraw()
 			end
 			function Chart:Replay()
