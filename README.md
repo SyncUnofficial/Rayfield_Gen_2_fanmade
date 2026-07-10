@@ -160,15 +160,6 @@ Tab:CreateBarChart({
 	Points = {{Label = "M1", Value = 2}, {Label = "M2", Value = 5}, 6, 4},
 })
 
-Tab:CreatePieChart({
-	Name = "Key Sources",
-	Slices = {
-		{Name = "Via Internet", Value = 62.5},
-		{Name = "Agencies", Value = 25},
-		{Name = "Both", Value = 12.5},
-	},
-})
-
 Tab:CreateStackedChart({
 	Name = "Spending",
 	Series = {"Housing", "Food", "Transport"},
@@ -178,18 +169,9 @@ Tab:CreateStackedChart({
 	},
 })
 
-Tab:CreateRadarChart({
-	Name = "Team Skills",
-	Axes = {"Innovation", "Customer", "Efficiency", "Teamwork", "Revenue"},
-	Max = 10,
-	Sets = {
-		{Name = "This Year", Values = {9, 10, 7, 7, 3}},
-		{Name = "Last Year", Values = {5, 6, 9, 8, 9}},
-	},
-})
 ```
 
-Bar charts take plain numbers or `{Label, Value}` pairs and support `Push`. Pie slices and stacked series pick theme colors automatically, pass `Color` per slice or `Colors` on the chart to override. Radar is outline style since Roblox can't fill arbitrary polygons.
+Bar charts take plain numbers or `{Label, Value}` pairs and support `Push`. Stacked series pick theme colors automatically, pass `Colors` on the chart to override.
 
 ### Rows and columns
 

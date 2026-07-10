@@ -193,16 +193,6 @@ local Kills = Numbers:CreateBarChart({
 	},
 })
 
-Numbers:CreatePieChart({
-	Name = "Key Sources",
-	Icon = "pie-chart",
-	Slices = {
-		{Name = "Via Internet", Value = 62.5},
-		{Name = "Agencies", Value = 25},
-		{Name = "Both", Value = 12.5},
-	},
-})
-
 Numbers:CreateStackedChart({
 	Name = "Spending",
 	Icon = "wallet",
@@ -212,17 +202,6 @@ Numbers:CreateStackedChart({
 		{Name = "Ben", Values = {12, 10, 8}},
 		{Name = "Clara", Values = {16, 10, 10}},
 		{Name = "David", Values = {20, 24, 6}},
-	},
-})
-
-Numbers:CreateRadarChart({
-	Name = "Team Skills",
-	Icon = "radar",
-	Axes = {"Innovation", "Customer", "Efficiency", "Teamwork", "Revenue"},
-	Max = 10,
-	Sets = {
-		{Name = "This Year", Values = {9, 10, 7, 7, 3}},
-		{Name = "Last Year", Values = {5, 6, 9, 8, 9}},
 	},
 })
 
