@@ -2407,7 +2407,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 				if filled then
 					local colW = 3
-					local count = math.floor(w / colW)
+					local fillX = rxs[1]
+					local count = math.floor((rxs[rn] - fillX) / colW)
 					for i = #cols, count + 1, -1 do
 						cols[i]:Destroy()
 						cols[i] = nil
@@ -2431,13 +2432,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 							})
 							cols[c] = f
 						end
-						local cx = (c - 0.5) * colW
+						local cx = fillX + (c - 0.5) * colW
 						while seg < rn - 1 and rxs[seg + 1] < cx do seg = seg + 1 end
 						local x1, x2 = rxs[seg], rxs[seg + 1]
 						local a = math.clamp((cx - x1) / math.max(x2 - x1, 1), 0, 1)
 						local y = rys[seg] + (rys[seg + 1] - rys[seg]) * a
 						local props = {
-							Position = UDim2.fromOffset((c - 1) * colW, h - 1),
+							Position = UDim2.fromOffset(fillX + (c - 1) * colW, h - 1),
 							Size = UDim2.fromOffset(colW, math.max(h - 1 - y, 0)),
 						}
 						colTargets[c] = props.Size
