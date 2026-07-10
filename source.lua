@@ -2270,6 +2270,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 				ZIndex = 3,
 				Parent = plot,
 			})
+			local segCanvas = create("Frame", {
+				BackgroundTransparency = 1,
+				Parent = segHolder,
+			})
 			local dotHolder = create("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
@@ -2290,6 +2294,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local function redraw(animate)
 				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
 				if w < 24 or h < 24 then return end
+				segCanvas.Size = UDim2.fromOffset(w, h)
 				local n = #points
 				local lo, hi = points[1], points[1]
 				for _, v in ipairs(points) do
@@ -2317,8 +2322,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 						local x2, y2 = xsCache[i + 1], ysCache[i + 1]
 						local x3 = xsCache[i + 2] or x2
 						local y3 = ysCache[i + 2] or y2
-						for tstep = 0, 15 do
-							local a = tstep / 16
+						local sub = math.clamp(math.ceil((x2 - x1) / 3), 8, 36)
+						for tstep = 0, sub - 1 do
+							local a = tstep / sub
 							rxs[#rxs + 1] = catmull(x0, x1, x2, x3, a)
 							rys[#rys + 1] = math.clamp(catmull(y0, y1, y2, y3, a), 2, h - 2)
 						end
@@ -2376,7 +2382,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 							AnchorPoint = Vector2.new(0.5, 0.5),
 							BorderSizePixel = 0,
 							ZIndex = 3,
-							Parent = segHolder,
+							Parent = segCanvas,
 						})
 						paint(s, "BackgroundColor3", "AccentSoft")
 						roundFull(s)
@@ -2385,8 +2391,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 					local dx = rxs[i + 1] - rxs[i]
 					local dy = rys[i + 1] - rys[i]
 					local props = {
-						Position = UDim2.fromOffset(rxs[i] + dx / 2, rys[i] + dy / 2),
-						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + 4, 3),
+						Position = UDim2.fromScale((rxs[i] + dx / 2) / w, (rys[i] + dy / 2) / h),
+						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + (smooth and 3 or 4), 3),
 						Rotation = math.deg(math.atan2(dy, dx)),
 					}
 					if animate and not fresh then
