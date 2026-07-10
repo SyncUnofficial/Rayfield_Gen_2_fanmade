@@ -242,6 +242,11 @@ local function commafy(s)
 	return sign .. s
 end
 
+local function catmull(p0, p1, p2, p3, t)
+	local t2, t3 = t * t, t * t * t
+	return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3)
+end
+
 local function countingValue(label, initial)
 	local token = 0
 	local current = initial ~= nil and parsenum(initial) or nil
@@ -2073,6 +2078,92 @@ function RayfieldLibrary:CreateWindow(Settings)
 			return StatValue
 		end
 
+		local chartPalette = {rgb(150, 222, 186), rgb(70, 168, 120), rgb(44, 108, 80), rgb(26, 62, 47), rgb(214, 240, 226)}
+
+		local function chartShell(settings, h)
+			local card = create("Frame", {
+				Size = UDim2.new(1, 0, 0, h),
+				LayoutOrder = nextOrder(),
+				ClipsDescendants = true,
+				Parent = page,
+			})
+			card:SetAttribute("SearchName", settings.Name or "")
+			paint(card, "BackgroundColor3", "Card")
+			cardBase(card)
+			local textX = 17
+			if settings.Icon then
+				local ic = makeIcon(card, settings.Icon, 18, Theme.TextTitle, 0.04)
+				if ic then
+					ic.Position = UDim2.fromOffset(16, 13)
+					textX = 44
+				end
+			end
+			local nameLabel = create("TextLabel", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(textX, 13),
+				Size = UDim2.new(0.5, -textX, 0, 18),
+				Font = FONT_BOLD,
+				TextSize = 16,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				Text = settings.Name or "",
+				Parent = card,
+			})
+			paint(nameLabel, "TextColor3", "TextTitle")
+			local valueLabel = create("TextLabel", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -17, 0, 11),
+				Size = UDim2.new(0.4, 0, 0, 22),
+				Font = FONT_BOLD,
+				TextSize = 20,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				Text = "",
+				Parent = card,
+			})
+			paint(valueLabel, "TextColor3", "TextTitle")
+			return card, nameLabel, valueLabel
+		end
+
+		local function replayOnVisible(card, entrance)
+			local function chainVisible()
+				local a = card
+				while a and not a:IsA("ScreenGui") do
+					if a:IsA("GuiObject") and not a.Visible then return false end
+					a = a.Parent
+				end
+				return true
+			end
+			task.defer(function()
+				local node = card.Parent
+				while node and not node:IsA("ScreenGui") do
+					if node:IsA("GuiObject") then
+						local nn = node
+						nn:GetPropertyChangedSignal("Visible"):Connect(function()
+							if nn.Visible and chainVisible() then task.defer(entrance) end
+						end)
+					end
+					node = node.Parent
+				end
+				if chainVisible() then entrance() end
+			end)
+		end
+
+		local function lineSeg(parent, x1, y1, x2, y2, thick, z)
+			local s = create("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BorderSizePixel = 0,
+				ZIndex = z or 2,
+				Parent = parent,
+			})
+			roundFull(s)
+			local dx, dy = x2 - x1, y2 - y1
+			s.Position = UDim2.fromOffset(x1 + dx / 2, y1 + dy / 2)
+			s.Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + 1, thick)
+			s.Rotation = math.deg(math.atan2(dy, dx))
+			return s
+		end
+
 		function Tab:CreateChart(ChartSettings)
 			ChartSettings = ChartSettings or {}
 			local points = {}
@@ -2086,6 +2177,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local suffix = ChartSettings.Suffix or ""
 			local decimals = ChartSettings.Decimals or 0
 			local filled = ChartSettings.Filled ~= false
+			local smooth = ChartSettings.Smooth == true
 			local maxPoints = ChartSettings.MaxPoints or math.max(#points, 12)
 
 			local cardH = compact and 118 or 152
@@ -2214,11 +2306,32 @@ function RayfieldLibrary:CreateWindow(Settings)
 					ysCache[i] = nil
 				end
 
+				local rxs, rys = xsCache, ysCache
+				if smooth and n >= 3 then
+					rxs, rys = {}, {}
+					for i = 1, n - 1 do
+						local x0 = xsCache[i > 1 and i - 1 or 1]
+						local y0 = ysCache[i > 1 and i - 1 or 1]
+						local x1, y1 = xsCache[i], ysCache[i]
+						local x2, y2 = xsCache[i + 1], ysCache[i + 1]
+						local x3 = xsCache[i + 2] or x2
+						local y3 = ysCache[i + 2] or y2
+						for tstep = 0, 5 do
+							local a = tstep / 6
+							rxs[#rxs + 1] = catmull(x0, x1, x2, x3, a)
+							rys[#rys + 1] = math.clamp(catmull(y0, y1, y2, y3, a), 2, h - 2)
+						end
+					end
+					rxs[#rxs + 1] = xsCache[n]
+					rys[#rys + 1] = ysCache[n]
+				end
+				local rn = #rxs
+
 				for i = #dots, n + 1, -1 do
 					dots[i]:Destroy()
 					dots[i] = nil
 				end
-				for i = #segs, n, -1 do
+				for i = #segs, rn, -1 do
 					segs[i]:Destroy()
 					segs[i] = nil
 				end
@@ -2253,7 +2366,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					end
 				end
 
-				for i = 1, n - 1 do
+				for i = 1, rn - 1 do
 					local s = segs[i]
 					local fresh = not s
 					if fresh then
@@ -2267,10 +2380,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 						roundFull(s)
 						segs[i] = s
 					end
-					local dx = xsCache[i + 1] - xsCache[i]
-					local dy = ysCache[i + 1] - ysCache[i]
+					local dx = rxs[i + 1] - rxs[i]
+					local dy = rys[i + 1] - rys[i]
 					local props = {
-						Position = UDim2.fromOffset(xsCache[i] + dx / 2, ysCache[i] + dy / 2),
+						Position = UDim2.fromOffset(rxs[i] + dx / 2, rys[i] + dy / 2),
 						Size = UDim2.fromOffset(math.ceil(math.sqrt(dx * dx + dy * dy)) + 2, 3),
 						Rotation = math.deg(math.atan2(dy, dx)),
 					}
@@ -2310,10 +2423,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 							cols[c] = f
 						end
 						local cx = (c - 0.5) * colW
-						while seg < n - 1 and xsCache[seg + 1] < cx do seg = seg + 1 end
-						local x1, x2 = xsCache[seg], xsCache[seg + 1]
+						while seg < rn - 1 and rxs[seg + 1] < cx do seg = seg + 1 end
+						local x1, x2 = rxs[seg], rxs[seg + 1]
 						local a = math.clamp((cx - x1) / math.max(x2 - x1, 1), 0, 1)
-						local y = ysCache[seg] + (ysCache[seg + 1] - ysCache[seg]) * a
+						local y = rys[seg] + (rys[seg + 1] - rys[seg]) * a
 						local props = {
 							Position = UDim2.fromOffset((c - 1) * colW, h - 1),
 							Size = UDim2.fromOffset(colW, math.max(h - 1 - y, 0)),
@@ -2482,6 +2595,875 @@ function RayfieldLibrary:CreateWindow(Settings)
 			end
 			function Chart:Replay()
 				if hoverIdx then applyHover(nil) end
+				entrance()
+			end
+			return Chart
+		end
+
+		function Tab:CreateBarChart(ChartSettings)
+			ChartSettings = ChartSettings or {}
+			local function parsePoints(list)
+				local v, l = {}, {}
+				for _, item in ipairs(list or {}) do
+					if type(item) == "table" then
+						local nv = tonumber(item.Value)
+						if nv then
+							v[#v + 1] = nv
+							l[#v] = item.Label
+						end
+					else
+						local nv = tonumber(item)
+						if nv then v[#v + 1] = nv end
+					end
+				end
+				if #v == 0 then v = {0} end
+				return v, l
+			end
+			local vals, labs = parsePoints(ChartSettings.Points)
+			local prefix = ChartSettings.Prefix or ""
+			local suffix = ChartSettings.Suffix or ""
+			local decimals = ChartSettings.Decimals or 0
+			local maxPoints = ChartSettings.MaxPoints or math.max(#vals, 12)
+			local hasLabels = next(labs) ~= nil
+
+			local card, nameLabel, valueLabel = chartShell(ChartSettings, hasLabels and 168 or 152)
+			local plot = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(17, 44),
+				Size = UDim2.new(1, -34, 1, hasLabels and -74 or -58),
+				Parent = card,
+			})
+			create("Frame", {
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.93,
+				BorderSizePixel = 0,
+				Position = UDim2.new(0, 0, 0.5, 0),
+				Size = UDim2.new(1, 0, 0, 1),
+				Parent = plot,
+			})
+			create("Frame", {
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.93,
+				BorderSizePixel = 0,
+				Position = UDim2.new(0, 0, 1, -1),
+				Size = UDim2.new(1, 0, 0, 1),
+				Parent = plot,
+			})
+			local barHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 2,
+				Parent = plot,
+			})
+
+			local bars, barTargets, labelInsts = {}, {}, {}
+			local hoverIdx = nil
+			local function fmt(n)
+				local str = decimals > 0 and string.format("%." .. decimals .. "f", n) or tostring(math.floor(n + 0.5))
+				return prefix .. commafy(str) .. suffix
+			end
+			local setValue = odometerValue(valueLabel, fmt(vals[#vals]))
+
+			local function redraw(animate)
+				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
+				if w < 24 or h < 24 then return end
+				local n = #vals
+				local hi = 0
+				for _, v in ipairs(vals) do hi = math.max(hi, v) end
+				if hi <= 0 then hi = 1 end
+				for i = #bars, n + 1, -1 do
+					bars[i]:Destroy()
+					bars[i] = nil
+					barTargets[i] = nil
+				end
+				for i = #labelInsts, n + 1, -1 do
+					labelInsts[i]:Destroy()
+					labelInsts[i] = nil
+				end
+				local slot = w / n
+				local barW = math.max(6, math.min(46, math.floor(slot * 0.72)))
+				for i = 1, n do
+					local b = bars[i]
+					local fresh = not b
+					if fresh then
+						b = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 1),
+							BorderSizePixel = 0,
+							ZIndex = 2,
+							Parent = barHolder,
+						})
+						paint(b, "BackgroundColor3", "Accent")
+						round(b, 6)
+						create("UIGradient", {
+							Rotation = 90,
+							Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(178, 178, 178)),
+							Parent = b,
+						})
+						bars[i] = b
+					end
+					local bh = math.max(3, math.floor(math.max(vals[i], 0) / hi * (h - 12)))
+					local props = {
+						Position = UDim2.fromOffset(math.floor(slot * (i - 0.5) + 0.5), h - 1),
+						Size = UDim2.fromOffset(barW, bh),
+					}
+					barTargets[i] = props.Size
+					if fresh then
+						b.Position = props.Position
+						if animate then
+							b.Size = UDim2.fromOffset(barW, 0)
+							tween(b, TI_MORPH, {Size = props.Size})
+						else
+							b.Size = props.Size
+						end
+					elseif animate then
+						tween(b, TI_MORPH, props)
+					else
+						b.Position = props.Position
+						b.Size = props.Size
+					end
+					if hasLabels then
+						local lab = labelInsts[i]
+						if not lab then
+							lab = create("TextLabel", {
+								BackgroundTransparency = 1,
+								AnchorPoint = Vector2.new(0.5, 0),
+								Size = UDim2.fromOffset(math.floor(slot), 12),
+								Font = FONT_MEDIUM,
+								TextSize = 11,
+								TextTruncate = Enum.TextTruncate.AtEnd,
+								Parent = plot,
+							})
+							paint(lab, "TextColor3", "TextMuted")
+							labelInsts[i] = lab
+						end
+						lab.Position = UDim2.new(0, math.floor(slot * (i - 0.5) + 0.5), 1, 3)
+						lab.Text = labs[i] or ""
+					end
+				end
+			end
+
+			local function applyHover(i)
+				if hoverIdx == i then return end
+				if hoverIdx and bars[hoverIdx] then
+					bars[hoverIdx].BackgroundColor3 = Theme.Accent
+				end
+				hoverIdx = i
+				if i and bars[i] then
+					bars[i].BackgroundColor3 = Theme.AccentSoft
+					setValue(fmt(vals[i]))
+				else
+					setValue(fmt(vals[#vals]))
+				end
+			end
+
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+				local w = plot.AbsoluteSize.X
+				if w < 24 or #vals == 0 then return end
+				local rx = input.Position.X - plot.AbsolutePosition.X
+				local i = math.clamp(math.floor(rx / (w / #vals)) + 1, 1, #vals)
+				applyHover(i)
+			end)
+			card.MouseLeave:Connect(function()
+				applyHover(nil)
+			end)
+
+			local animToken = 0
+			local function entrance()
+				if #bars == 0 then return end
+				animToken = animToken + 1
+				local my = animToken
+				for i, b in ipairs(bars) do
+					local target = barTargets[i] or b.Size
+					b.Size = UDim2.fromOffset(target.X.Offset, 0)
+					task.delay(0.04 + (i - 1) * 0.05, function()
+						if my ~= animToken then return end
+						tween(b, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = target})
+					end)
+				end
+			end
+
+			plot:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				redraw(false)
+			end)
+			task.defer(function() redraw(false) end)
+			replayOnVisible(card, entrance)
+
+			local Chart = {}
+			function Chart:Set(newSettings)
+				newSettings = newSettings or {}
+				if newSettings.Name then
+					nameLabel.Text = newSettings.Name
+					card:SetAttribute("SearchName", newSettings.Name)
+				end
+				if newSettings.Points then
+					if hoverIdx then applyHover(nil) end
+					vals, labs = parsePoints(newSettings.Points)
+					while #vals > maxPoints do
+						table.remove(vals, 1)
+						table.remove(labs, 1)
+					end
+					setValue(fmt(vals[#vals]))
+					redraw(true)
+				end
+			end
+			function Chart:Push(v, label)
+				local nv = tonumber(v)
+				if not nv then return end
+				if hoverIdx then applyHover(nil) end
+				vals[#vals + 1] = nv
+				labs[#vals] = label
+				while #vals > maxPoints do
+					table.remove(vals, 1)
+					table.remove(labs, 1)
+				end
+				setValue(fmt(vals[#vals]))
+				redraw(true)
+			end
+			function Chart:Replay()
+				if hoverIdx then applyHover(nil) end
+				entrance()
+			end
+			return Chart
+		end
+
+		function Tab:CreatePieChart(ChartSettings)
+			ChartSettings = ChartSettings or {}
+			local function parseSlices(list)
+				local out = {}
+				for _, s in ipairs(list or {}) do
+					local v = tonumber(s.Value)
+					if v and v > 0 then
+						out[#out + 1] = {name = s.Name or "", value = v, color = s.Color}
+					end
+				end
+				if #out == 0 then out = {{name = "", value = 1}} end
+				return out
+			end
+			local slices = parseSlices(ChartSettings.Slices)
+
+			local card, nameLabel, valueLabel = chartShell(ChartSettings, 176)
+			local R = 56
+			local pcx, pcy = 17 + R + 4, 44 + R + 6
+			local disc = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				Parent = card,
+			})
+			local RAYS = 90
+			local rays, rayslice = {}, {}
+			for r = 1, RAYS do
+				rays[r] = create("Frame", {
+					AnchorPoint = Vector2.new(0.5, 1),
+					Position = UDim2.fromOffset(pcx, pcy),
+					Size = UDim2.fromOffset(7, R),
+					Rotation = (r - 0.5) * (360 / RAYS),
+					BorderSizePixel = 0,
+					ZIndex = 2,
+					Parent = disc,
+				})
+			end
+			local legend = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(pcx + R + 24, 52),
+				Size = UDim2.new(1, -(pcx + R + 41), 1, -66),
+				Parent = card,
+			})
+			create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Vertical,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 7),
+				Parent = legend,
+			})
+
+			local total = 0
+			local legendNames = {}
+			local function pct(v)
+				local p = v / math.max(total, 0.0001) * 100
+				local str = string.format("%.1f", p)
+				str = str:gsub("%.0$", "")
+				return str .. "%"
+			end
+			local function repaintPie()
+				total = 0
+				for _, s in ipairs(slices) do total = total + s.value end
+				for i, s in ipairs(slices) do
+					s.color = s.color or chartPalette[(i - 1) % #chartPalette + 1]
+				end
+				local acc, si = 0, 1
+				for r = 1, RAYS do
+					local frac = (r - 0.5) / RAYS
+					while si < #slices and frac > (acc + slices[si].value) / total do
+						acc = acc + slices[si].value
+						si = si + 1
+					end
+					rays[r].BackgroundColor3 = slices[si].color
+					rayslice[r] = si
+				end
+				for _, ch in ipairs(legend:GetChildren()) do
+					if ch:IsA("Frame") then ch:Destroy() end
+				end
+				legendNames = {}
+				for i, s in ipairs(slices) do
+					local row = create("Frame", {
+						BackgroundTransparency = 1,
+						Size = UDim2.new(1, 0, 0, 16),
+						LayoutOrder = i,
+						Parent = legend,
+					})
+					local chip = create("Frame", {
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 0, 0.5, 0),
+						Size = UDim2.fromOffset(10, 10),
+						BackgroundColor3 = s.color,
+						BorderSizePixel = 0,
+						Parent = row,
+					})
+					roundFull(chip)
+					local nm = create("TextLabel", {
+						BackgroundTransparency = 1,
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 18, 0.5, 0),
+						Size = UDim2.new(1, -70, 0, 14),
+						Font = FONT_MEDIUM,
+						TextSize = 13,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextTruncate = Enum.TextTruncate.AtEnd,
+						Text = s.name,
+						Parent = row,
+					})
+					paint(nm, "TextColor3", "TextBody")
+					local pc = create("TextLabel", {
+						BackgroundTransparency = 1,
+						AnchorPoint = Vector2.new(1, 0.5),
+						Position = UDim2.new(1, 0, 0.5, 0),
+						Size = UDim2.fromOffset(48, 14),
+						Font = FONT_MEDIUM,
+						TextSize = 13,
+						TextXAlignment = Enum.TextXAlignment.Right,
+						Text = pct(s.value),
+						Parent = row,
+					})
+					paint(pc, "TextColor3", "TextSub")
+					legendNames[i] = nm
+				end
+			end
+			repaintPie()
+
+			local hoverSlice = nil
+			local function applyHover(si)
+				if hoverSlice == si then return end
+				if hoverSlice then
+					for r = 1, RAYS do
+						if rayslice[r] == hoverSlice then
+							rays[r].BackgroundColor3 = slices[hoverSlice] and slices[hoverSlice].color or rays[r].BackgroundColor3
+						end
+					end
+					if legendNames[hoverSlice] then legendNames[hoverSlice].TextColor3 = Theme.TextBody end
+				end
+				hoverSlice = si
+				if si and slices[si] then
+					local lit = slices[si].color:Lerp(Color3.fromRGB(255, 255, 255), 0.22)
+					for r = 1, RAYS do
+						if rayslice[r] == si then rays[r].BackgroundColor3 = lit end
+					end
+					if legendNames[si] then legendNames[si].TextColor3 = Color3.fromRGB(255, 255, 255) end
+					valueLabel.Text = pct(slices[si].value)
+				else
+					valueLabel.Text = ""
+				end
+			end
+
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+				local dx = input.Position.X - (card.AbsolutePosition.X + pcx)
+				local dy = input.Position.Y - (card.AbsolutePosition.Y + pcy)
+				if dx * dx + dy * dy > R * R then
+					applyHover(nil)
+					return
+				end
+				local ang = math.deg(math.atan2(dx, -dy))
+				if ang < 0 then ang = ang + 360 end
+				local acc = 0
+				for i, s in ipairs(slices) do
+					acc = acc + s.value / total * 360
+					if ang <= acc then
+						applyHover(i)
+						return
+					end
+				end
+				applyHover(#slices)
+			end)
+			card.MouseLeave:Connect(function()
+				applyHover(nil)
+			end)
+
+			local animToken = 0
+			local function entrance()
+				animToken = animToken + 1
+				local my = animToken
+				for r = 1, RAYS do
+					rays[r].BackgroundTransparency = 1
+					task.delay((r - 1) / RAYS * 0.7, function()
+						if my ~= animToken then return end
+						tween(rays[r], TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+					end)
+				end
+			end
+			replayOnVisible(card, entrance)
+
+			local Chart = {}
+			function Chart:Set(newSettings)
+				newSettings = newSettings or {}
+				if newSettings.Name then
+					nameLabel.Text = newSettings.Name
+					card:SetAttribute("SearchName", newSettings.Name)
+				end
+				if newSettings.Slices then
+					applyHover(nil)
+					slices = parseSlices(newSettings.Slices)
+					repaintPie()
+				end
+			end
+			function Chart:Replay()
+				applyHover(nil)
+				entrance()
+			end
+			return Chart
+		end
+
+		function Tab:CreateStackedChart(ChartSettings)
+			ChartSettings = ChartSettings or {}
+			local series = {}
+			for _, s in ipairs(ChartSettings.Series or {}) do
+				series[#series + 1] = tostring(s)
+			end
+			local colors = {}
+			for i = 1, math.max(#series, 1) do
+				colors[i] = (ChartSettings.Colors and ChartSettings.Colors[i]) or chartPalette[(i - 1) % #chartPalette + 1]
+			end
+			local function parseRows(list)
+				local out = {}
+				for _, r in ipairs(list or {}) do
+					local vals = {}
+					for _, v in ipairs(r.Values or {}) do
+						vals[#vals + 1] = math.max(tonumber(v) or 0, 0)
+					end
+					out[#out + 1] = {name = r.Name or "", values = vals}
+				end
+				if #out == 0 then out = {{name = "", values = {1}}} end
+				return out
+			end
+			local rowsData = parseRows(ChartSettings.Rows)
+			local prefix = ChartSettings.Prefix or ""
+			local suffix = ChartSettings.Suffix or ""
+
+			local cardH = 78 + #rowsData * 34
+			local card, nameLabel, valueLabel = chartShell(ChartSettings, cardH)
+			local legend = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(17, 40),
+				Size = UDim2.new(1, -34, 0, 18),
+				Parent = card,
+			})
+			create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 14),
+				Parent = legend,
+			})
+			for i, s in ipairs(series) do
+				local item = create("Frame", {
+					BackgroundTransparency = 1,
+					AutomaticSize = Enum.AutomaticSize.X,
+					Size = UDim2.new(0, 0, 1, 0),
+					LayoutOrder = i,
+					Parent = legend,
+				})
+				local chip = create("Frame", {
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.new(0, 0, 0.5, 0),
+					Size = UDim2.fromOffset(10, 10),
+					BackgroundColor3 = colors[i],
+					BorderSizePixel = 0,
+					Parent = item,
+				})
+				roundFull(chip)
+				local nm = create("TextLabel", {
+					BackgroundTransparency = 1,
+					AutomaticSize = Enum.AutomaticSize.X,
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.new(0, 16, 0.5, 0),
+					Size = UDim2.new(0, 0, 0, 14),
+					Font = FONT_MEDIUM,
+					TextSize = 13,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Text = s,
+					Parent = item,
+				})
+				paint(nm, "TextColor3", "TextSub")
+			end
+			local rowsHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(17, 66),
+				Size = UDim2.new(1, -34, 1, -80),
+				Parent = card,
+			})
+
+			local rowInsts = {}
+			local segMap = {}
+			local hoverKey = nil
+			local function fmt(n)
+				return prefix .. commafy(tostring(math.floor(n + 0.5))) .. suffix
+			end
+
+			local function rebuildRows()
+				for _, inst in ipairs(rowInsts) do inst:Destroy() end
+				rowInsts = {}
+				segMap = {}
+				for i, r in ipairs(rowsData) do
+					local rf = create("Frame", {
+						BackgroundTransparency = 1,
+						Position = UDim2.fromOffset(0, (i - 1) * 34),
+						Size = UDim2.new(1, 0, 0, 28),
+						Parent = rowsHolder,
+					})
+					local nm = create("TextLabel", {
+						BackgroundTransparency = 1,
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 0, 0.5, 0),
+						Size = UDim2.fromOffset(76, 14),
+						Font = FONT_MEDIUM,
+						TextSize = 13,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextTruncate = Enum.TextTruncate.AtEnd,
+						Text = r.name,
+						Parent = rf,
+					})
+					paint(nm, "TextColor3", "TextBody")
+					local track = create("Frame", {
+						BackgroundTransparency = 1,
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 84, 0.5, 0),
+						Size = UDim2.new(1, -84, 0, 22),
+						Parent = rf,
+					})
+					local barc = create("Frame", {
+						BackgroundTransparency = 1,
+						ClipsDescendants = true,
+						Size = UDim2.new(0, 0, 1, 0),
+						Parent = track,
+					})
+					round(barc, 6)
+					rowInsts[i] = rf
+					segMap[i] = {track = track, container = barc, segs = {}}
+				end
+			end
+
+			local function redraw(animate)
+				local hi = 0
+				for _, r in ipairs(rowsData) do
+					local t = 0
+					for _, v in ipairs(r.values) do t = t + v end
+					r.total = t
+					hi = math.max(hi, t)
+				end
+				if hi <= 0 then hi = 1 end
+				for i, r in ipairs(rowsData) do
+					local m = segMap[i]
+					if m then
+						local trackW = m.track.AbsoluteSize.X
+						if trackW < 10 then trackW = 300 end
+						local contW = math.floor(trackW * r.total / hi + 0.5)
+						local props = {Size = UDim2.new(0, contW, 1, 0)}
+						if animate then
+							tween(m.container, TI_MORPH, props)
+						else
+							m.container.Size = props.Size
+						end
+						for _, sg in ipairs(m.segs) do sg:Destroy() end
+						m.segs = {}
+						local x = 0
+						for k, v in ipairs(r.values) do
+							local segW = math.floor(v / math.max(r.total, 0.0001) * contW + 0.5)
+							if k == #r.values then segW = contW - x end
+							local sg = create("Frame", {
+								Position = UDim2.fromOffset(x, 0),
+								Size = UDim2.new(0, segW, 1, 0),
+								BackgroundColor3 = colors[k] or chartPalette[1],
+								BorderSizePixel = 0,
+								Parent = m.container,
+							})
+							m.segs[k] = sg
+							x = x + segW
+						end
+					end
+				end
+			end
+
+			local function applyHover(key)
+				if hoverKey and (not key or key[1] ~= hoverKey[1] or key[2] ~= hoverKey[2]) then
+					local m = segMap[hoverKey[1]]
+					local sg = m and m.segs[hoverKey[2]]
+					if sg then sg.BackgroundColor3 = colors[hoverKey[2]] or chartPalette[1] end
+					hoverKey = nil
+					valueLabel.Text = ""
+				end
+				if key then
+					local m = segMap[key[1]]
+					local sg = m and m.segs[key[2]]
+					local v = rowsData[key[1]] and rowsData[key[1]].values[key[2]]
+					if sg and v then
+						hoverKey = key
+						sg.BackgroundColor3 = (colors[key[2]] or chartPalette[1]):Lerp(Color3.fromRGB(255, 255, 255), 0.22)
+						valueLabel.Text = fmt(v)
+					end
+				end
+			end
+
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+				local ry = input.Position.Y - rowsHolder.AbsolutePosition.Y
+				local i = math.floor(ry / 34) + 1
+				local m = segMap[i]
+				if not m then
+					applyHover(nil)
+					return
+				end
+				local rx = input.Position.X - m.container.AbsolutePosition.X
+				if rx < 0 or rx > m.container.AbsoluteSize.X then
+					applyHover(nil)
+					return
+				end
+				local x = 0
+				for k, sg in ipairs(m.segs) do
+					x = x + sg.AbsoluteSize.X
+					if rx <= x then
+						applyHover({i, k})
+						return
+					end
+				end
+				applyHover(nil)
+			end)
+			card.MouseLeave:Connect(function()
+				applyHover(nil)
+			end)
+
+			local animToken = 0
+			local function entrance()
+				animToken = animToken + 1
+				local my = animToken
+				for i, m in ipairs(segMap) do
+					local target = m.container.Size
+					m.container.Size = UDim2.new(0, 0, 1, 0)
+					task.delay(0.05 + (i - 1) * 0.09, function()
+						if my ~= animToken then return end
+						tween(m.container, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = target})
+					end)
+				end
+			end
+
+			rowsHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				redraw(false)
+			end)
+			rebuildRows()
+			task.defer(function() redraw(false) end)
+			replayOnVisible(card, entrance)
+
+			local Chart = {}
+			function Chart:Set(newSettings)
+				newSettings = newSettings or {}
+				if newSettings.Name then
+					nameLabel.Text = newSettings.Name
+					card:SetAttribute("SearchName", newSettings.Name)
+				end
+				if newSettings.Rows then
+					applyHover(nil)
+					rowsData = parseRows(newSettings.Rows)
+					rebuildRows()
+					redraw(true)
+				end
+			end
+			function Chart:Replay()
+				applyHover(nil)
+				entrance()
+			end
+			return Chart
+		end
+
+		function Tab:CreateRadarChart(ChartSettings)
+			ChartSettings = ChartSettings or {}
+			local axes = {}
+			for _, a in ipairs(ChartSettings.Axes or {}) do
+				axes[#axes + 1] = tostring(a)
+			end
+			if #axes < 3 then axes = {"A", "B", "C"} end
+			local function parseSets(list)
+				local out = {}
+				for i, s in ipairs(list or {}) do
+					local vals = {}
+					for k = 1, #axes do
+						vals[k] = math.max(tonumber(s.Values and s.Values[k]) or 0, 0)
+					end
+					out[#out + 1] = {name = s.Name or "", values = vals, color = s.Color or chartPalette[(i - 1) % #chartPalette + 1]}
+				end
+				if #out == 0 then out = {{name = "", values = table.create(#axes, 1), color = chartPalette[1]}} end
+				return out
+			end
+			local sets = parseSets(ChartSettings.Sets)
+			local maxV = tonumber(ChartSettings.Max)
+
+			local card, nameLabel, valueLabel = chartShell(ChartSettings, 250)
+			local plot = create("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(17, 44),
+				Size = UDim2.new(1, -34, 1, -58),
+				Parent = card,
+			})
+			local webHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				Parent = plot,
+			})
+			local setHolder = create("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 3,
+				Parent = plot,
+			})
+			local setFrames = {}
+
+			local function axisPoint(k, frac, w, h)
+				local ang = math.rad((k - 1) / #axes * 360 - 90)
+				local R = math.min(h / 2 - 24, 78)
+				local cx, cy = w / 2, h / 2 + 4
+				return cx + math.cos(ang) * R * frac, cy + math.sin(ang) * R * frac
+			end
+
+			local function redraw()
+				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
+				if w < 40 or h < 40 then return end
+				for _, ch in ipairs(webHolder:GetChildren()) do ch:Destroy() end
+				for _, ch in ipairs(setHolder:GetChildren()) do ch:Destroy() end
+				setFrames = {}
+				local hi = maxV
+				if not hi then
+					hi = 1
+					for _, s in ipairs(sets) do
+						for _, v in ipairs(s.values) do hi = math.max(hi, v) end
+					end
+				end
+				for _, ringFrac in ipairs({1 / 3, 2 / 3, 1}) do
+					for k = 1, #axes do
+						local x1, y1 = axisPoint(k, ringFrac, w, h)
+						local x2, y2 = axisPoint(k % #axes + 1, ringFrac, w, h)
+						local sg = lineSeg(webHolder, x1, y1, x2, y2, 1, 1)
+						sg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+						sg.BackgroundTransparency = 0.92
+					end
+				end
+				for k = 1, #axes do
+					local cx, cy = axisPoint(k, 0, w, h)
+					local x2, y2 = axisPoint(k, 1, w, h)
+					local sg = lineSeg(webHolder, cx, cy, x2, y2, 1, 1)
+					sg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					sg.BackgroundTransparency = 0.94
+					local lx, ly = axisPoint(k, 1.28, w, h)
+					local lab = create("TextLabel", {
+						BackgroundTransparency = 1,
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(math.clamp(lx, 40, w - 40), ly),
+						Size = UDim2.fromOffset(88, 12),
+						Font = FONT_MEDIUM,
+						TextSize = 11,
+						TextTruncate = Enum.TextTruncate.AtEnd,
+						Text = axes[k],
+						Parent = webHolder,
+					})
+					paint(lab, "TextColor3", "TextMuted")
+				end
+				for si, s in ipairs(sets) do
+					local frames = {segs = {}, dots = {}}
+					local pts = {}
+					for k = 1, #axes do
+						local frac = math.clamp(s.values[k] / hi, 0, 1)
+						local x, y = axisPoint(k, frac, w, h)
+						pts[k] = {x, y}
+					end
+					for k = 1, #axes do
+						local a = pts[k]
+						local b = pts[k % #axes + 1]
+						local sg = lineSeg(setHolder, a[1], a[2], b[1], b[2], 2, 3)
+						sg.BackgroundColor3 = s.color
+						sg.BackgroundTransparency = 0.1
+						frames.segs[k] = sg
+					end
+					for k = 1, #axes do
+						local dt = create("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.fromOffset(pts[k][1], pts[k][2]),
+							Size = UDim2.fromOffset(6, 6),
+							BackgroundColor3 = s.color,
+							BorderSizePixel = 0,
+							ZIndex = 4,
+							Parent = setHolder,
+						})
+						roundFull(dt)
+						frames.dots[k] = dt
+					end
+					setFrames[si] = frames
+				end
+			end
+
+			local animToken = 0
+			local function entrance()
+				if #setFrames == 0 then return end
+				animToken = animToken + 1
+				local my = animToken
+				for si, frames in ipairs(setFrames) do
+					local at = (si - 1) * 0.18
+					for _, sg in ipairs(frames.segs) do
+						sg.BackgroundTransparency = 1
+						task.delay(at, function()
+							if my ~= animToken then return end
+							tween(sg, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1})
+						end)
+					end
+					for k, dt in ipairs(frames.dots) do
+						dt.Size = UDim2.fromOffset(0, 0)
+						task.delay(at + 0.08 + k * 0.04, function()
+							if my ~= animToken then return end
+							tween(dt, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(6, 6)})
+						end)
+					end
+				end
+			end
+
+			plot:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				redraw()
+			end)
+			task.defer(redraw)
+			replayOnVisible(card, entrance)
+
+			local Chart = {}
+			function Chart:Set(newSettings)
+				newSettings = newSettings or {}
+				if newSettings.Name then
+					nameLabel.Text = newSettings.Name
+					card:SetAttribute("SearchName", newSettings.Name)
+				end
+				if newSettings.Axes then
+					axes = {}
+					for _, a in ipairs(newSettings.Axes) do
+						axes[#axes + 1] = tostring(a)
+					end
+					if #axes < 3 then axes = {"A", "B", "C"} end
+				end
+				if newSettings.Max then maxV = tonumber(newSettings.Max) end
+				if newSettings.Sets then sets = parseSets(newSettings.Sets) end
+				redraw()
+			end
+			function Chart:Replay()
 				entrance()
 			end
 			return Chart

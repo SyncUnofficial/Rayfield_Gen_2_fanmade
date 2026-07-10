@@ -171,12 +171,69 @@ Numbers:CreateButton({
 	end,
 })
 
+local Session = Numbers:CreateChart({
+	Name = "Session Time",
+	Icon = "activity",
+	Suffix = " min",
+	Smooth = true,
+	Points = {6, 12, 9, 21, 11, 22, 13, 15, 7, 19, 12, 24},
+})
+
+local Kills = Numbers:CreateBarChart({
+	Name = "Kills per Match",
+	Icon = "crosshair",
+	Points = {
+		{Label = "M1", Value = 2},
+		{Label = "M2", Value = 3},
+		{Label = "M3", Value = 5},
+		{Label = "M4", Value = 6},
+		{Label = "M5", Value = 4},
+		{Label = "M6", Value = 3},
+		{Label = "M7", Value = 2},
+	},
+})
+
+Numbers:CreatePieChart({
+	Name = "Key Sources",
+	Icon = "pie-chart",
+	Slices = {
+		{Name = "Via Internet", Value = 62.5},
+		{Name = "Agencies", Value = 25},
+		{Name = "Both", Value = 12.5},
+	},
+})
+
+Numbers:CreateStackedChart({
+	Name = "Spending",
+	Icon = "wallet",
+	Series = {"Housing", "Food", "Transport"},
+	Rows = {
+		{Name = "Anna", Values = {8, 8, 4}},
+		{Name = "Ben", Values = {12, 10, 8}},
+		{Name = "Clara", Values = {16, 10, 10}},
+		{Name = "David", Values = {20, 24, 6}},
+	},
+})
+
+Numbers:CreateRadarChart({
+	Name = "Team Skills",
+	Icon = "radar",
+	Axes = {"Innovation", "Customer", "Efficiency", "Teamwork", "Revenue"},
+	Max = 10,
+	Sets = {
+		{Name = "This Year", Values = {9, 10, 7, 7, 3}},
+		{Name = "Last Year", Values = {5, 6, 9, 8, 9}},
+	},
+})
+
 Numbers:CreateButton({
 	Name = "Show Graph Animation",
 	Icon = "play",
 	Callback = function()
 		Revenue:Replay()
 		Players:Replay()
+		Session:Replay()
+		Kills:Replay()
 	end,
 })
 
