@@ -2303,8 +2303,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 				local range = hi - lo
 				if range == 0 then range = math.max(math.abs(hi), 1) end
+				local edgePad = (smooth and 3 or 4) / 2 + 1.5
 				for i = 1, n do
-					xsCache[i] = (i - 1) / (n - 1) * w
+					xsCache[i] = edgePad + (i - 1) / (n - 1) * (w - edgePad * 2)
 					ysCache[i] = math.floor(10 + (1 - (points[i] - lo) / range) * (h - 22) + 0.5)
 				end
 				for i = #xsCache, n + 1, -1 do
