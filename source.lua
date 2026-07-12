@@ -4076,6 +4076,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Position = UDim2.fromOffset(0, 56),
 				Size = UDim2.new(1, 0, 0, 0),
 				ClipsDescendants = true,
+				Visible = false,
 				Parent=wrapper,
 			})
 
@@ -4200,7 +4201,15 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			clicker.MouseButton1Click:Connect(function()
 				open = not open
-				tween(panel, TI_MED, {Size = UDim2.new(1,0, 0, open and (3 * 34 + 8) or 0)})
+				if open then
+					panel.Visible = true
+					tween(panel, TI_MED, {Size = UDim2.new(1, 0, 0, 3 * 34 + 8)})
+				else
+					local t = tween(panel, TI_MED, {Size = UDim2.new(1, 0, 0, 0)})
+					t.Completed:Connect(function()
+						if not open then panel.Visible = false end
+					end)
+				end
 			end)
 
 			function ColorPicker:Set(newColor)
