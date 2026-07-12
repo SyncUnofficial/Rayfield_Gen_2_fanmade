@@ -4028,20 +4028,13 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local EXPO = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 			local EXPO_FAST = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
-			local wrapper = create("Frame", {
-				BackgroundTransparency=1,
-				AutomaticSize = Enum.AutomaticSize.Y,
-				Size = UDim2.new(1, 0, 0, COLLAPSED_H),
-				LayoutOrder = nextOrder(),
-				Parent = page,
-			})
-			wrapper:SetAttribute("SearchName", ColorPickerSettings.Name or "")
-
 			local card = create("Frame", {
 				Size = UDim2.new(1, 0, 0, COLLAPSED_H),
 				ClipsDescendants = true,
-				Parent = wrapper,
+				LayoutOrder = nextOrder(),
+				Parent = page,
 			})
+			card:SetAttribute("SearchName", ColorPickerSettings.Name or "")
 			paint(card, "BackgroundColor3", "Card")
 			cardBase(card)
 			hoverable(card)
@@ -4297,10 +4290,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 					tween(clicker, EXPO, {Size = UDim2.fromScale(1, 1)})
 					tween(sv, EXPO, {Position = UDim2.new(1, -16, 0, 25), Size = UDim2.fromOffset(42, 26)})
 					tween(display, EXPO, {BackgroundTransparency = 0})
+					huePoint.Visible = false
 					tween(hueBar, EXPO, {Position = UDim2.new(1, -16, 0, 25), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1})
-					task.delay(0.3, function()
-						if not open then huePoint.Visible = false end
-					end)
 					for _, r in ipairs(revealers) do tween(r.inst, EXPO, {[r.prop] = 1}) end
 					for _, sl in ipairs(sliders) do tween(sl.inst, EXPO, {Position = UDim2.new(0, sl.x, 0, sl.closedY)}) end
 				end
