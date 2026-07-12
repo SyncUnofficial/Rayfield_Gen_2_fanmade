@@ -4068,17 +4068,19 @@ function RayfieldLibrary:CreateWindow(Settings)
 			}
 
 			local h, s, v = color:ToHSV()
+			local open = false
+			local push, refresh
 
 			local sv = create("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -16, 0, 25),
 				Size = UDim2.fromOffset(42, 26),
 				BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-				ClipsDescendants = true,
 				Parent = card,
 			})
 			round(sv, 9)
 			create("UIStroke", {Color = Theme.Stroke, Transparency = 0.85, Parent = sv})
+			local svGlow = softGlow(sv, color, 0.85, 34, 0)
 
 			local satOverlay = create("Frame", {
 				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -4111,8 +4113,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 			})
 			local svPoint = create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(14, 14),
+				Size = UDim2.fromOffset(16, 16),
 				BackgroundColor3 = color,
+				Visible = false,
 				Parent = sv,
 			})
 			roundFull(svPoint)
@@ -4156,7 +4159,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local huePoint = create("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0, 0, 0.5, 0),
-				Size = UDim2.fromOffset(16, 16),
+				Size = UDim2.fromOffset(18, 18),
 				BackgroundColor3 = Color3.fromHSV(h, 1, 1),
 				Visible = false,
 				Parent = hueBar,
@@ -4181,22 +4184,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				inst.Position = UDim2.new(0, x, 0, closedY)
 			end
 
-			local function makeField(letter, letterX, boxX, y, boxW, initial)
-				if letter then
-					local lab = create("TextLabel", {
-						BackgroundTransparency = 1,
-						AnchorPoint = Vector2.new(0, 0.5),
-						Size = UDim2.fromOffset(14, 30),
-						Font = FONT_MEDIUM,
-						TextSize = 13,
-						Text = letter,
-						TextTransparency = 1,
-						Parent = card,
-					})
-					paint(lab, "TextColor3", "TextSub")
-					addReveal(lab, "TextTransparency", 0)
-					addSlide(lab, letterX, y, y + 16)
-				end
+			local function makeField(letter, boxX, y, boxW, initial)
 				local box = create("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
 					Size = UDim2.fromOffset(boxW, 30),
@@ -4206,10 +4194,26 @@ function RayfieldLibrary:CreateWindow(Settings)
 				paint(box, "BackgroundColor3", "CardInset")
 				round(box, 8)
 				local st = create("UIStroke", {Color = Theme.Stroke, Transparency = 1, Parent = box})
+				local inset = 10
+				if letter then
+					local lab = create("TextLabel", {
+						BackgroundTransparency = 1,
+						Position = UDim2.fromOffset(10, 0),
+						Size = UDim2.new(0, 12, 1, 0),
+						Font = FONT_MEDIUM,
+						TextSize = 12,
+						Text = letter,
+						TextTransparency = 1,
+						Parent = box,
+					})
+					paint(lab, "TextColor3", "TextMuted")
+					addReveal(lab, "TextTransparency", 0)
+					inset = 26
+				end
 				local tb = create("TextBox", {
 					BackgroundTransparency = 1,
-					Position = UDim2.new(0, 10, 0, 0),
-					Size = UDim2.new(1, -16, 1, 0),
+					Position = UDim2.new(0, inset, 0, 0),
+					Size = UDim2.new(1, -inset - 6, 1, 0),
 					Font = FONT_MEDIUM,
 					TextSize = 14,
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -4224,13 +4228,69 @@ function RayfieldLibrary:CreateWindow(Settings)
 				addReveal(st, "Transparency", 0.85)
 				addReveal(tb, "TextTransparency", 0)
 				addSlide(box, boxX, y, y + 16)
+				tb.Focused:Connect(function()
+					tween(st, TI_FAST, {Color = Theme.Accent, Transparency = 0.25})
+				end)
+				tb.FocusLost:Connect(function()
+					tween(st, TI_FAST, {Color = Theme.Stroke, Transparency = 0.85})
+				end)
 				return tb
 			end
 
-			local hexTb = makeField(nil, 0, 16, 66, 168, "#FFFFFF")
-			local rTb = makeField("R", 16, 32, 104, 44, "255")
-			local gTb = makeField("G", 84, 100, 104, 44, "255")
-			local bTb = makeField("B", 152, 168, 104, 44, "255")
+			local hexTb = makeField(nil, 16, 70, 168, "#FFFFFF")
+			local rTb = makeField("R", 16, 112, 52, "255")
+			local gTb = makeField("G", 74, 112, 52, "255")
+			local bTb = makeField("B", 132, 112, 52, "255")
+
+			local preview = create("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Size = UDim2.fromOffset(168, 32),
+				BackgroundColor3 = color,
+				BackgroundTransparency = 1,
+				Parent = card,
+			})
+			round(preview, 10)
+			local previewStroke = create("UIStroke", {Color = Theme.Stroke, Transparency = 1, Parent = preview})
+			addReveal(preview, "BackgroundTransparency", 0)
+			addReveal(previewStroke, "Transparency", 0.85)
+			addSlide(preview, 16, 155, 171)
+
+			local presetColors = {
+				Color3.fromRGB(255, 255, 255),
+				Color3.fromRGB(255, 59, 48),
+				Color3.fromRGB(255, 159, 10),
+				Color3.fromRGB(255, 214, 10),
+				Color3.fromRGB(52, 199, 89),
+				Color3.fromRGB(10, 132, 255),
+				Color3.fromRGB(191, 90, 242),
+			}
+			for idx, presetColor in ipairs(presetColors) do
+				local dot = create("TextButton", {
+					Text = "",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Size = UDim2.fromOffset(18, 18),
+					BackgroundColor3 = presetColor,
+					BackgroundTransparency = 1,
+					Parent = card,
+				})
+				roundFull(dot)
+				local dotStroke = create("UIStroke", {Color = Theme.Stroke, Transparency = 1, Parent = dot})
+				addReveal(dot, "BackgroundTransparency", 0)
+				addReveal(dotStroke, "Transparency", 0.8)
+				addSlide(dot, 25 + (idx - 1) * 25, 188, 204)
+				dot.MouseEnter:Connect(function()
+					if open then tween(dot, TI_FAST, {Size = UDim2.fromOffset(22, 22)}) end
+				end)
+				dot.MouseLeave:Connect(function()
+					tween(dot, TI_FAST, {Size = UDim2.fromOffset(18, 18)})
+				end)
+				dot.MouseButton1Click:Connect(function()
+					if not open then return end
+					h, s, v = presetColor:ToHSV()
+					refresh()
+					push(true)
+				end)
+			end
 
 			local clicker = create("TextButton", {
 				BackgroundTransparency = 1,
@@ -4239,7 +4299,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				Parent = card,
 			})
 
-			local function push(fire)
+			push = function(fire)
 				local c = Color3.fromHSV(h, s, v)
 				ColorPicker.Color = c
 				if fire then
@@ -4248,7 +4308,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 			end
 
-			local function refresh()
+			refresh = function()
 				local hueColor = Color3.fromHSV(h, 1, 1)
 				sv.BackgroundColor3 = hueColor
 				local c = Color3.fromHSV(h, s, v)
@@ -4257,6 +4317,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 				svPoint.Position = UDim2.new(s, 0, 1 - v, 0)
 				huePoint.BackgroundColor3 = hueColor
 				huePoint.Position = UDim2.new(h, 0, 0.5, 0)
+				preview.BackgroundColor3 = c
+				svGlow.ImageColor3 = c
 				ColorPicker.Color = c
 				local r = math.floor(c.R * 255 + 0.5)
 				local g = math.floor(c.G * 255 + 0.5)
@@ -4267,7 +4329,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 				if not hexTb:IsFocused() then hexTb.Text = string.format("#%02X%02X%02X", r, g, b) end
 			end
 
-			local open = false
 			local function setOpen(state)
 				if state == open then return end
 				open = state
@@ -4281,6 +4342,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 						end
 					end)
 					tween(display, EXPO, {BackgroundTransparency = 1})
+					svPoint.Visible = true
 					huePoint.Visible = true
 					tween(hueBar, EXPO, {Position = UDim2.new(1, -16, 0, HUE_CY), Size = UDim2.fromOffset(SV_W, 14), BackgroundTransparency = 0})
 					for _, r in ipairs(revealers) do tween(r.inst, EXPO, {[r.prop] = r.shown}) end
@@ -4290,6 +4352,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					tween(clicker, EXPO, {Size = UDim2.fromScale(1, 1)})
 					tween(sv, EXPO, {Position = UDim2.new(1, -16, 0, 25), Size = UDim2.fromOffset(42, 26)})
 					tween(display, EXPO, {BackgroundTransparency = 0})
+					svPoint.Visible = false
 					huePoint.Visible = false
 					tween(hueBar, EXPO, {Position = UDim2.new(1, -16, 0, 25), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1})
 					for _, r in ipairs(revealers) do tween(r.inst, EXPO, {[r.prop] = 1}) end
