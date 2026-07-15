@@ -1,115 +1,110 @@
 local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/SyncUnofficial/Rayfield_Gen_2_fanmade/main/source.lua"))()
 
 local Window = Rayfield:CreateWindow({
-	Name = "Example",
-	Subtitle = "Rayfield Gen2",
-	Icon = "shell",
-	Badge = {Text = "us-en", Icon = "messages-square"},
-	LoadingTitle = "Example",
-	LoadingSubtitle = "by Rayfield Gen2",
-	ToggleUIKeybind = "K",
-	ConfigurationSaving = {
-		Enabled = true,
-		FolderName = "RayfieldGen2Example",
-		FileName = "Example",
+	name = "Example",
+	subtitle = "Rayfield Gen2",
+	icon = "shell",
+	theme = "default",
+	configuration = {
+		autoSave = true,
+		autoLoad = true,
+		fileName = "ExampleHub",
+	},
+	translations = {
+		fr = { ["Auto Sprint"] = "Sprint auto", ["Home"] = "Accueil" },
 	},
 })
 
-local Home = Window:CreateTab("Home", "house")
-local Numbers = Window:CreateTab("Numbers", "chart-no-axes-column")
-local Layout = Window:CreateTab("Layout", "layout-grid")
+Window:CreateTag({ text = "us-en", color = Color3.fromRGB(255, 175, 15) })
 
-Home:CreateSection("Gameplay")
+local Home = Window:CreateTab({ name = "Home", icon = "house" })
+local Fields = Window:CreateTab({ name = "Fields", icon = "text-cursor-input" })
+local Numbers = Window:CreateTab({ name = "Numbers", icon = "chart-no-axes-column" })
+local Layout = Window:CreateTab({ name = "Layout", icon = "layout-grid" })
+
+Home:CreateSection({ name = "Gameplay", icon = "gamepad-2" })
 
 Home:CreateToggle({
-	Name = "Auto Sprint",
-	Icon = "fast-forward",
-	CurrentValue = true,
-	Flag = "AutoSprint",
-	Callback = function(value)
+	name = "Auto Sprint",
+	icon = "fast-forward",
+	value = true,
+	flag = "AutoSprint",
+	callback = function(value)
 		print("Auto Sprint:", value)
 	end,
 })
 
 Home:CreateToggle({
-	Name = "Reduced Motion",
-	CurrentValue = false,
-	Flag = "ReducedMotion",
-	Description = "Disables screen shake and camera effects for a smoother experience.",
-	Callback = function(value)
+	name = "Reduced Motion",
+	value = false,
+	flag = "ReducedMotion",
+	description = "Disables screen shake and camera effects for a smoother experience.",
+	callback = function(value)
 		print("Reduced Motion:", value)
 	end,
 })
 
 Home:CreateSlider({
-	Name = "Field of View",
-	Range = {70, 120},
-	Increment = 1,
-	Suffix = "°",
-	CurrentValue = 104,
-	Flag = "FieldOfView",
-	Callback = function(value)
+	name = "Field of View",
+	range = { 70, 120 },
+	increment = 1,
+	suffix = "°",
+	value = 104,
+	flag = "FieldOfView",
+	callback = function(value)
 		workspace.CurrentCamera.FieldOfView = value
 	end,
 })
 
-Home:CreateSection("Notifications")
+Home:CreateSection({ name = "Messages", icon = "bell" })
 
 Home:CreateButton({
-	Name = "Send Notification",
-	Icon = "bell",
-	Callback = function()
-		Rayfield:Notify({
-			Title = "Heads up",
-			Content = "This is a notification. Hover to pause it, or click to dismiss early.",
-			Duration = 5,
-			Image = "house",
+	name = "Send Notification",
+	icon = "bell",
+	callback = function()
+		Window:Notify({
+			title = "Heads up",
+			content = "This is a notification. Hover to pause it, or click to dismiss early.",
+			duration = 5,
+			icon = "house",
 		})
 	end,
 })
 
 Home:CreateButton({
-	Name = "Send Long Notification",
-	Icon = "bell",
-	Callback = function()
-		Rayfield:Notify({
-			Title = "Longer notification",
-			Content = "This one has a lot more text so you can check that the card grows to fit the content, wraps every line properly, and still slides in and out from the right side smoothly.",
-			Duration = 8,
-			Image = "chart-no-axes-column",
-		})
+	name = "Drop a Toast",
+	icon = "check",
+	callback = function()
+		Window:Toast({ title = "Saved", icon = "check" })
 	end,
 })
 
 Home:CreateButton({
-	Name = "Send Without Icon",
-	Icon = "bell",
-	Callback = function()
-		Rayfield:Notify({
-			Title = "No icon here",
-			Content = "Notifications work fine without an icon too, and the text column stretches to fill the width.",
-			Duration = 6,
+	name = "Open Popup",
+	icon = "message-square",
+	callback = function()
+		Window:Popup({
+			title = "Reset everything?",
+			content = "This clears every saved value. You can't undo it.",
+			options = {
+				{ text = "Cancel" },
+				{ text = "Reset", style = "danger", callback = function() print("reset") end },
+			},
 		})
 	end,
 })
 
-Home:CreateButton({
-	Name = "Send 3 Stacked",
-	Icon = "bell",
-	Callback = function()
-		for i = 1, 3 do
-			Rayfield:Notify({
-				Title = "Heads up",
-				Content = "This is a notification. Hover to pause it, or click to dismiss early.",
-				Duration = 4 + i,
-				Image = "house",
-			})
-			task.wait(0.45)
-		end
+Home:CreateSection({ name = "Appearance", icon = "palette" })
+
+Home:CreateDropdown({
+	name = "Theme",
+	options = { "default", "cobalt", "ember", "amethyst", "frost", "rose" },
+	value = "default",
+	flag = "Theme",
+	callback = function(choice)
+		Window:ChangeTheme(choice)
 	end,
 })
-
-Home:CreateSection("FAQ")
 
 Home:CreateFAQ({
 	Items = {
@@ -119,61 +114,76 @@ Home:CreateFAQ({
 		},
 		{
 			Question = "Will my existing Rayfield scripts work?",
-			Answer = "Yes. Gen 2 keeps the original Rayfield API, so most scripts load without any changes. Swap the loadstring URL and your window, tabs and elements come up in the new look.",
+			Answer = "Yes. Both the original PascalCase API and the new Gen2 API are accepted, so most scripts load without any changes.",
 		},
 		{
 			Question = "Is this affiliated with Sirius?",
 			Answer = "No. This is an unofficial fan remake and has no connection to Sirius or the actual Rayfield developers. The real Rayfield lives at docs.sirius.menu.",
 		},
-		{
-			Question = "Where do I report bugs or suggest features?",
-			Answer = "There is no formal bug tracker or update roadmap. This is a fanmade build whose only goal is to let people experience Gen 2 before the official release, so ongoing updates are not planned. If you still want to share a problem or an idea, the Discord server is the place: https://discord.gg/hXtTC9SVfX",
-		},
-		{
-			Question = "How can I connect with the creator?",
-			Answer = "Join the Discord server at https://discord.gg/hXtTC9SVfX. That is the one place to reach me, whether it is feedback, questions or just to hang out.",
-		},
 	},
 })
 
-Home:CreateSection("Interface")
+Fields:CreateSection({ name = "Setup" })
 
-Home:CreateToggle({
-	Name = "Show FPS Counter",
-	CurrentValue = false,
-	Flag = "ShowFPS",
-	Callback = function(value)
-		print("FPS Counter:", value)
+Fields:CreateInput({
+	name = "Player Name",
+	placeholder = "Enter a name",
+	value = "",
+	flag = "PlayerName",
+	callback = function(text)
+		print("Name:", text)
 	end,
 })
 
-Home:CreateToggle({
-	Name = "Compact HUD",
-	CurrentValue = false,
-	Flag = "CompactHUD",
-	Callback = function(value)
-		print("Compact HUD:", value)
+Fields:CreateInput({
+	name = "Max Players",
+	numeric = true,
+	value = "16",
+	placeholder = "Enter a number",
+	description = "Numeric only, commits when you click away or press enter.",
+	flag = "MaxPlayers",
+	callback = function(text)
+		print("Max players:", text)
 	end,
 })
 
-Numbers:CreateSection("Main")
+Fields:CreateKeybind({
+	name = "Sprint",
+	value = Enum.KeyCode.LeftShift,
+	flag = "SprintKey",
+	callback = function(key)
+		print("Pressed", key)
+	end,
+})
+
+Fields:CreateColorPicker({
+	name = "Highlight",
+	color = Color3.fromRGB(96, 205, 255),
+	alpha = 1,
+	flag = "Highlight",
+	callback = function(color, alpha)
+		print("Color:", color, "Alpha:", alpha)
+	end,
+})
+
+Numbers:CreateSection({ name = "Main" })
 
 local Stat = Numbers:CreateStat({
-	Name = "Currency",
-	Icon = "coins",
-	Value = "$21",
-	Delta = "+19%",
+	name = "Currency",
+	icon = "coins",
+	prefix = "$",
+	value = 21,
 })
 
 Numbers:CreateButton({
-	Name = "Button",
-	Icon = "sparkles",
-	Callback = function()
-		Stat:Set({Value = "$" .. tostring(math.random(10, 99)), Delta = "+" .. tostring(math.random(1, 30)) .. "%"})
+	name = "Roll",
+	icon = "sparkles",
+	callback = function()
+		Stat:Set(math.random(10, 99))
 	end,
 })
 
-Numbers:CreateSection("Charts")
+Numbers:CreateSection({ name = "Charts" })
 
 local Revenue = Numbers:CreateChart({
 	Name = "Revenue",
@@ -190,20 +200,12 @@ local Players = Numbers:CreateChart({
 })
 
 Numbers:CreateButton({
-	Name = "Push Data",
-	Icon = "trending-up",
-	Callback = function()
+	name = "Push Data",
+	icon = "trending-up",
+	callback = function()
 		Revenue:Push(12400 + math.random(-1500, 2500))
 		Players:Push(540 + math.random(-120, 160))
 	end,
-})
-
-local Session = Numbers:CreateChart({
-	Name = "Session Time",
-	Icon = "activity",
-	Suffix = " min",
-	Smooth = true,
-	Points = {6, 12, 9, 21, 11, 22, 13, 15, 7, 19, 12, 24},
 })
 
 local Kills = Numbers:CreateBarChart({
@@ -215,8 +217,6 @@ local Kills = Numbers:CreateBarChart({
 		{Label = "M3", Value = 5},
 		{Label = "M4", Value = 6},
 		{Label = "M5", Value = 4},
-		{Label = "M6", Value = 3},
-		{Label = "M7", Value = 2},
 	},
 })
 
@@ -228,194 +228,35 @@ Numbers:CreateStackedChart({
 		{Name = "Anna", Values = {8, 8, 4}},
 		{Name = "Ben", Values = {12, 10, 8}},
 		{Name = "Clara", Values = {16, 10, 10}},
-		{Name = "David", Values = {20, 24, 6}},
 	},
 })
 
-Numbers:CreateButton({
-	Name = "Show Graph Animation",
-	Icon = "play",
-	Callback = function()
-		Revenue:Replay()
-		Players:Replay()
-		Session:Replay()
-		Kills:Replay()
-	end,
-})
-
-Numbers:CreateToggle({
-	Name = "Automatic Trade Negotiation",
-	Icon = "message-square",
-	CurrentValue = false,
-	Flag = "AutoTrade",
-	Description = "This feature will enable trades to be completed automatically using AI tone and conversation engines.",
-	Callback = function(value)
-		print("Auto trade:", value)
-	end,
-})
-
-Numbers:CreateSlider({
-	Name = "Trades",
-	Icon = "layout-panel-left",
-	Range = {0, 60},
-	Increment = 1,
-	Suffix = "a minute",
-	CurrentValue = 22,
-	Flag = "TradesPerMinute",
-	Callback = function(value)
-		print("Trades per minute:", value)
-	end,
-})
-
-Numbers:CreateKeybind({
-	Name = "Toggle Automation",
-	Icon = "settings-2",
-	CurrentKeybind = "Q",
-	Flag = "AutomationKey",
-	Callback = function()
-		print("Automation toggled")
-	end,
-})
-
-Numbers:CreateInput({
-	Name = "Target Player",
-	PlaceholderText = "Dynamic Input",
-	CurrentValue = "",
-	Flag = "TargetPlayer",
-	Callback = function(text)
-		print("Target:", text)
-	end,
-})
-
 Numbers:CreateDropdown({
-	Name = "Dropdown",
-	Options = {"Option 1", "Option 2", "Option 3", "Option 4"},
-	CurrentOption = {"Option 1"},
-	Flag = "DemoDropdown",
-	Callback = function(selection)
-		print("Selected:", table.concat(selection, ", "))
+	name = "Modules",
+	multiSelect = true,
+	options = { "Aimbot", "ESP", "Fly", "Noclip" },
+	value = { "ESP" },
+	flag = "Modules",
+	callback = function(selected)
+		print("Selected:", table.concat(selected, ", "))
 	end,
 })
 
-Layout:CreateSection("Main")
+Layout:CreateSection({ name = "Two columns" })
 
-local TopRow = Layout:CreateRow()
-TopRow:CreateToggle({
-	Name = "Switch",
-	Icon = "messages-square",
-	CurrentValue = false,
-	Flag = "RowSwitch",
-	Callback = function(value)
-		print("Row switch:", value)
-	end,
-})
-TopRow:CreateButton({
-	Name = "Button",
-	Icon = "sparkles",
-	Callback = function()
-		print("Row button pressed")
-	end,
-})
+local grid = Layout:CreateGroup()
 
-local StatRow = Layout:CreateRow()
-local Money = StatRow:CreateStat({
-	Name = "Money",
-	Icon = "messages-square",
-	Delta = "+19%",
-})
-StatRow:CreateButton({
-	Name = "Play",
-	Icon = "sparkles",
-	Callback = function()
-		Money:Set({Delta = "+" .. tostring(math.random(1, 40)) .. "%"})
-	end,
-})
+local left = grid:CreateGroup({ direction = "column" })
+left:CreateToggle({ name = "Aimbot", flag = "Aimbot", callback = function(v) print("Aimbot:", v) end })
+left:CreateToggle({ name = "Triggerbot", flag = "Triggerbot", callback = function(v) print("Triggerbot:", v) end })
 
-Layout:CreateSection("Row")
+local right = grid:CreateGroup({ direction = "column" })
+right:CreateToggle({ name = "ESP", value = true, flag = "ESP", callback = function(v) print("ESP:", v) end })
+right:CreateToggle({ name = "Tracers", flag = "Tracers", callback = function(v) print("Tracers:", v) end })
 
-local TripleRow = Layout:CreateRow()
-TripleRow:CreateButton({
-	Name = "Save",
-	Icon = "layout-panel-left",
-	Callback = function()
-		print("Saved")
-	end,
+Window:Notify({
+	title = "Welcome back",
+	content = "Rayfield Gen2 loaded. Hover to pause, click to dismiss.",
+	duration = 6,
+	icon = "house",
 })
-TripleRow:CreateToggle({
-	Name = "ESP",
-	CurrentValue = true,
-	Flag = "RowESP",
-	Callback = function(value)
-		print("ESP:", value)
-	end,
-})
-local Kills = TripleRow:CreateStat({
-	Name = "Kills",
-	Icon = "chart-no-axes-column",
-	Value = "128",
-})
-
-Layout:CreateSection("Two columns")
-
-local Left, Right = Layout:CreateColumns(2)
-Left:CreateToggle({
-	Name = "Aimbot",
-	CurrentValue = false,
-	Flag = "Aimbot",
-	Callback = function(value)
-		print("Aimbot:", value)
-	end,
-})
-Left:CreateToggle({
-	Name = "Triggerbot",
-	CurrentValue = false,
-	Flag = "Triggerbot",
-	Callback = function(value)
-		print("Triggerbot:", value)
-	end,
-})
-Left:CreateSlider({
-	Name = "Smoothing",
-	Range = {0, 100},
-	Increment = 1,
-	Suffix = "%",
-	CurrentValue = 40,
-	Flag = "Smoothing",
-	Callback = function(value)
-		print("Smoothing:", value)
-	end,
-})
-Right:CreateToggle({
-	Name = "ESP Boxes",
-	CurrentValue = true,
-	Flag = "ESPBoxes",
-	Callback = function(value)
-		print("ESP Boxes:", value)
-	end,
-})
-Right:CreateToggle({
-	Name = "ESP Names",
-	CurrentValue = false,
-	Flag = "ESPNames",
-	Callback = function(value)
-		print("ESP Names:", value)
-	end,
-})
-Right:CreateDropdown({
-	Name = "ESP Color",
-	Options = {"Green", "Red", "Blue", "White"},
-	CurrentOption = {"Green"},
-	Flag = "ESPColor",
-	Callback = function(selection)
-		print("ESP Color:", table.concat(selection, ", "))
-	end,
-})
-
-Rayfield:Notify({
-	Title = "Welcome back",
-	Content = "Rayfield Gen2 loaded. Hover to pause, click to dismiss.",
-	Duration = 6,
-	Image = "house",
-})
-
-Rayfield:LoadConfiguration()
