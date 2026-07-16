@@ -8,6 +8,8 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer=Players.LocalPlayer
 
+local TOUCH_UI = UserInputService.TouchEnabled
+
 local useStudio = RunService:IsStudio()
 
 local fsAvailable = writefile and readfile and isfile and isfolder and makefolder
@@ -1030,6 +1032,60 @@ local toastStack = nil
 local popupLayer = nil
 local destroyed = false
 
+local UI_DESIGN_W, UI_DESIGN_H = 554, 612
+local autoUiScale = 1
+local userUiScale = 1
+local uiScaleObjects = {}
+local uiScaleWatchers = {}
+
+local function currentUiScale()
+	return math.clamp(autoUiScale * userUiScale, 0.5, 1.5)
+end
+
+local function applyUiScale()
+	local s = currentUiScale()
+	for i = #uiScaleObjects, 1, -1 do
+		local obj = uiScaleObjects[i]
+		if obj.Parent then
+			obj.Scale = s
+		else
+			table.remove(uiScaleObjects, i)
+		end
+	end
+	for i = #uiScaleWatchers, 1, -1 do
+		if not pcall(uiScaleWatchers[i], s) then
+			table.remove(uiScaleWatchers, i)
+		end
+	end
+end
+
+local function attachUiScale(inst)
+	local scaler = create("UIScale", {Scale = currentUiScale(), Parent = inst})
+	table.insert(uiScaleObjects, scaler)
+	return scaler
+end
+
+local function onUiScaleChanged(fn)
+	table.insert(uiScaleWatchers, fn)
+end
+
+local function refreshAutoScale()
+	if not rootGui then return end
+	local vp = rootGui.AbsoluteSize
+	if vp.X < 50 or vp.Y < 50 then return end
+	local fit = math.min(vp.X / UI_DESIGN_W, vp.Y / UI_DESIGN_H, 1)
+	local snapped = math.max(math.floor(fit * 100 + 0.5) / 100, 0.55)
+	if snapped ~= autoUiScale then
+		autoUiScale = snapped
+		applyUiScale()
+	end
+end
+
+local function setUserUiScale(factor)
+	userUiScale = math.clamp(factor, 0.5, 1.5)
+	applyUiScale()
+end
+
 local function ensureRoot()
 	if rootGui and rootGui.Parent then return rootGui end
 	rootGui = create("ScreenGui", {
@@ -1087,6 +1143,10 @@ local function ensureRoot()
 		Visible = false,
 		Parent = rootGui,
 	})
+	attachUiScale(notifyStack)
+	attachUiScale(toastStack)
+	connect(rootGui:GetPropertyChangedSignal("AbsoluteSize"), refreshAutoScale)
+	refreshAutoScale()
 	return rootGui
 end
 
@@ -1414,6 +1474,7 @@ function RayfieldLibrary:Popup(data)
 		Size = UDim2.fromOffset(CARD_W, cardH),
 		Parent = popupLayer,
 	})
+	attachUiScale(card)
 	paint(card, "BackgroundColor3", "Background")
 	round(card, 20)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9, Parent = card})
@@ -1775,6 +1836,7 @@ local function runKeySystem(Settings)
 		ZIndex = 51,
 		Parent = overlay,
 	})
+	attachUiScale(card)
 	round(card, 20)
 	create("UIStroke", {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.92, Parent = card})
 	create("UIGradient", {
@@ -2056,16 +2118,21 @@ function RayfieldLibrary:CreateWindow(Settings)
 	)
 	local PILL_W = math.clamp(12 + 44 + 12 + math.ceil(pillTextW) + 26, 180,340)
 
-	local shownPosition = UDim2.new(0.5,0, 0.5, -math.floor((WINDOW_H + 18) / 2))
+	local function shownPos()
+		return UDim2.new(0.5, 0, 0.5, -math.floor((WINDOW_H + 18) * currentUiScale() / 2))
+	end
 
 	local root = create("Frame", {
 		Name = "WindowRoot",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = shownPosition,
+		Position = shownPos(),
 		Size = UDim2.fromOffset(WINDOW_W,WINDOW_H + 18),
 		Parent = rootGui,
 	})
+	attachUiScale(root)
+	refreshAutoScale()
+	root.Position = shownPos()
 
 	local shadow = create("ImageLabel", {
 		Name = "Shadow",
@@ -2380,10 +2447,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 	})
 
 	local function headerButton(order,lucideNames)
+		local btnSize = TOUCH_UI and 38 or 30
 		local btn = create("TextButton", {
 			BackgroundTransparency = 1,
 			Text = "",
-			Size = UDim2.fromOffset(30, 30),
+			Size = UDim2.fromOffset(btnSize, btnSize),
 			LayoutOrder = order,
 			Parent = buttonRow,
 		})
@@ -2507,7 +2575,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 	local unlockCursor = false
 
 	connect(RunService.RenderStepped,function()
-		if unlockCursor and not hidden and not destroyed then
+		if unlockCursor and UserInputService.MouseEnabled and not hidden and not destroyed then
 			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 			UserInputService.MouseIconEnabled = true
 		end
@@ -2964,7 +3032,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					if open == state then return end
 					open = state
 					if open then
-						local ah = measureWrapped(answer, 14, FONT_REGULAR, math.max(card.AbsoluteSize.X - 40, 50))
+						local ah = measureWrapped(answer, 14, FONT_REGULAR, math.max(card.AbsoluteSize.X / currentUiScale() - 40, 50))
 						aLabel.Size = UDim2.new(1, -34, 0, ah + 4)
 						aLabel.Position = UDim2.fromOffset(17, 58)
 						tween(card, TI_MORPH, {Size = UDim2.new(1, 0, 0, 54 + ah + 16)})
@@ -3353,7 +3421,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local setValue = odometerValue(valueLabel, fmt(points[#points]))
 
 			local function redraw(animate)
-				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
+				local w, h = plot.AbsoluteSize.X / currentUiScale(), plot.AbsoluteSize.Y / currentUiScale()
 				if w < 24 or h < 24 then return end
 				segCanvas.Size = UDim2.fromOffset(w, h)
 				local n = #points
@@ -3548,10 +3616,9 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 			end
 
-			card.InputChanged:Connect(function(input)
-				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+			local function scrub(input)
 				if #xsCache < 2 then return end
-				local rx = input.Position.X - plot.AbsolutePosition.X
+				local rx = (input.Position.X - plot.AbsolutePosition.X) / currentUiScale()
 				local best, bestDist = nil, math.huge
 				for i = 1, #points do
 					local dist = math.abs((xsCache[i] or 0) - rx)
@@ -3560,6 +3627,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 					end
 				end
 				applyHover(best)
+			end
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+					scrub(input)
+				end
+			end)
+			card.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then scrub(input) end
+			end)
+			card.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then applyHover(nil) end
 			end)
 			card.MouseLeave:Connect(function()
 				applyHover(nil)
@@ -3570,7 +3648,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				if #dots == 0 then return end
 				animToken = animToken + 1
 				local my = animToken
-				local w = plot.AbsoluteSize.X
+				local w = plot.AbsoluteSize.X / currentUiScale()
 				if w < 24 then return end
 				local D = 0.75
 				segHolder.ClipsDescendants = true
@@ -3752,7 +3830,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local setValue = odometerValue(valueLabel, fmt(vals[#vals]))
 
 			local function redraw(animate)
-				local w, h = plot.AbsoluteSize.X, plot.AbsoluteSize.Y
+				local w, h = plot.AbsoluteSize.X / currentUiScale(), plot.AbsoluteSize.Y / currentUiScale()
 				if w < 24 or h < 24 then return end
 				local n = #vals
 				local hi = 0
@@ -3843,13 +3921,23 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 			end
 
-			card.InputChanged:Connect(function(input)
-				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+			local function scrub(input)
 				local w = plot.AbsoluteSize.X
 				if w < 24 or #vals == 0 then return end
 				local rx = input.Position.X - plot.AbsolutePosition.X
 				local i = math.clamp(math.floor(rx / (w / #vals)) + 1, 1, #vals)
 				applyHover(i)
+			end
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+					scrub(input)
+				end
+			end)
+			card.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then scrub(input) end
+			end)
+			card.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then applyHover(nil) end
 			end)
 			card.MouseLeave:Connect(function()
 				applyHover(nil)
@@ -4054,7 +4142,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				for i, r in ipairs(rowsData) do
 					local m = segMap[i]
 					if m then
-						local trackW = m.track.AbsoluteSize.X
+						local trackW = m.track.AbsoluteSize.X / currentUiScale()
 						if trackW < 10 then trackW = 300 end
 						local contW = math.floor(trackW * r.total / hi + 0.5)
 						local props = {Size = UDim2.new(0, contW, 1, 0)}
@@ -4103,9 +4191,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 			end
 
-			card.InputChanged:Connect(function(input)
-				if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-				local ry = input.Position.Y - rowsHolder.AbsolutePosition.Y
+			local function scrub(input)
+				local ry = (input.Position.Y - rowsHolder.AbsolutePosition.Y) / currentUiScale()
 				local i = math.floor(ry / 34) + 1
 				local m = segMap[i]
 				if not m then
@@ -4126,6 +4213,17 @@ function RayfieldLibrary:CreateWindow(Settings)
 					end
 				end
 				applyHover(nil)
+			end
+			card.InputChanged:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+					scrub(input)
+				end
+			end)
+			card.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then scrub(input) end
+			end)
+			card.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then applyHover(nil) end
 			end)
 			card.MouseLeave:Connect(function()
 				applyHover(nil)
@@ -4457,15 +4555,26 @@ function RayfieldLibrary:CreateWindow(Settings)
 				end
 			end
 
+			local hit = track
+			if TOUCH_UI then
+				hit = create("Frame", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.new(1, 14, 0, 38),
+					Parent = track,
+				})
+			end
+
 			local dragging = false
-			track.InputBegan:Connect(function(input)
+			hit.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
 					local alpha = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
 					setFromAlpha(math.clamp(alpha, 0, 1))
 				end
 			end)
-			track.InputEnded:Connect(function(input)
+			hit.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = false
 				end
@@ -5798,6 +5907,18 @@ function RayfieldLibrary:CreateWindow(Settings)
 				toggleKeyName = newKey
 			end,
 		})
+		SettingsTab:CreateSlider({
+			Name = "UI scale",
+			Icon = "maximize-2",
+			Description = "Scales the whole interface. It also adjusts automatically to fit small screens like phones.",
+			Range = {60, 130},
+			Increment = 5,
+			Suffix = "%",
+			CurrentValue = math.floor(userUiScale * 100 + 0.5),
+			Callback = function(value)
+				setUserUiScale(value / 100)
+			end,
+		})
 		SettingsTab:CreateToggle({
 			Name = "Unlock cursor while open",
 			Icon = "mouse-pointer-2",
@@ -5834,37 +5955,86 @@ function RayfieldLibrary:CreateWindow(Settings)
 		end
 	end)
 
+	local userMoved = false
+
+	local function clampPos(pos)
+		local vp = rootGui.AbsoluteSize
+		if vp.X < 50 or vp.Y < 50 then return pos end
+		local s = currentUiScale()
+		local halfW = WINDOW_W * s / 2
+		local ax = vp.X * pos.X.Scale + pos.X.Offset
+		local ay = vp.Y * pos.Y.Scale + pos.Y.Offset
+		local minX, maxX = halfW + 6, vp.X - halfW - 6
+		if minX > maxX then
+			minX, maxX = vp.X / 2, vp.X / 2
+		end
+		local nx = math.clamp(ax, minX, maxX)
+		local ny = math.clamp(ay, 6, math.max(6, vp.Y - HEADER_H * s - 6))
+		if math.abs(nx - ax) < 0.5 and math.abs(ny - ay) < 0.5 then return pos end
+		return UDim2.fromOffset(math.floor(nx + 0.5), math.floor(ny + 0.5))
+	end
+
+	local function clampRoot(animated, fromPos)
+		if hidden or destroyed then return end
+		local target = clampPos(fromPos or root.Position)
+		if target == (fromPos or root.Position) then return end
+		if animated then
+			tween(root, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = target})
+		else
+			root.Position = target
+		end
+	end
+
 	local function makeDraggable(zone)
 		local dragging = false
 		local dragStart = nil
 		local startPos=nil
+		local lastTarget = nil
 		zone.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				if morphing or hidden then return end
 				dragging = true
 				dragStart = input.Position
 				startPos = root.Position
+				lastTarget = nil
 			end
 		end)
 		zone.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = false
+				if lastTarget then
+					userMoved = true
+					clampRoot(true, lastTarget)
+					lastTarget = nil
+				end
 			end
 		end)
 		connect(UserInputService.InputChanged, function(input)
 			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 				local delta = input.Position - dragStart
+				lastTarget = UDim2.new(
+					startPos.X.Scale, startPos.X.Offset + delta.X,
+					startPos.Y.Scale, startPos.Y.Offset + delta.Y
+				)
 				tween(root, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-					Position = UDim2.new(
-						startPos.X.Scale, startPos.X.Offset + delta.X,
-						startPos.Y.Scale, startPos.Y.Offset + delta.Y
-					),
+					Position = lastTarget,
 				})
 			end
 		end)
 	end
 	makeDraggable(header)
 	makeDraggable(handle)
+
+	local function refitRoot()
+		if destroyed or hidden or morphing then return end
+		if userMoved then
+			clampRoot(false)
+		else
+			root.Position = shownPos()
+		end
+	end
+	connect(rootGui:GetPropertyChangedSignal("AbsoluteSize"), refitRoot)
+	onUiScaleChanged(refitRoot)
 
 	local function setMinimizeIcon(restore)
 		applyLucide(minimizeIcon, restore and {"maximize-2", "expand"} or {"minus"})
@@ -5917,7 +6087,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 		tween(window, TI_MORPH,{BackgroundColor3 = Theme.Background})
 		tween(windowStroke, TI_MORPH, {Transparency = 0.93})
 		tween(shadow,TI_MORPH, {ImageTransparency = 0.42})
-		tween(root, TI_MORPH, {Position = storedPosition or shownPosition})
+		tween(root, TI_MORPH, {Position = clampPos(storedPosition or shownPos())})
 		task.wait(0.36)
 		main.Visible = true
 		tween(main, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
@@ -5967,6 +6137,14 @@ function RayfieldLibrary:CreateWindow(Settings)
 		setMinimized(not minimized)
 	end
 	Window.ToggleMinimize = Window.ToggleMinimise
+
+	function Window:SetUIScale(factor)
+		setUserUiScale(tonumber(factor) or 1)
+	end
+
+	function Window:GetUIScale()
+		return currentUiScale()
+	end
 
 	function Window:SetLocale(id)
 		i18n.locale = id and tostring(id) or nil
@@ -6140,7 +6318,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			task.wait(0.16)
 			loading:Destroy()
 			tween(window, TI_SLOW, {Size = UDim2.fromOffset(WINDOW_W, WINDOW_H)})
-			tween(root, TI_SLOW, {Position = shownPosition})
+			tween(root, TI_SLOW, {Position = shownPos()})
 			task.wait(0.18)
 			tween(main, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
 			tween(handle, TI_SLOW, {BackgroundTransparency = 0.35})
@@ -6178,6 +6356,14 @@ function RayfieldLibrary:IsVisible()
 	return rootGui ~= nil
 end
 
+
+function RayfieldLibrary:SetUIScale(factor)
+	setUserUiScale(tonumber(factor) or 1)
+end
+
+function RayfieldLibrary:GetUIScale()
+	return currentUiScale()
+end
 
 function RayfieldLibrary:SetVisibility(visible)
 	if visible and RayfieldLibrary._showWindow then

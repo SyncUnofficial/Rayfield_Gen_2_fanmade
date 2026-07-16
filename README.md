@@ -243,7 +243,18 @@ Rayfield:SetVisibility(true)
 Rayfield:Destroy()
 ```
 
-The gear in the header opens a settings page where you can rebind the toggle key, unlock the cursor for games that lock it, or unload the whole thing.
+The gear in the header opens a settings page where you can rebind the toggle key, adjust the UI scale, unlock the cursor for games that lock it, or unload the whole thing.
+
+## Mobile
+
+The interface works on phones and tablets out of the box. On small screens the whole window scales down automatically so nothing sits off screen, sliders and charts respond to touch, the header buttons grow into proper tap targets, and dragging can never strand the window outside the viewport. Players can fine tune the size with the UI scale slider in settings, and scripts can do the same:
+
+```lua
+Rayfield:SetUIScale(0.9)   -- multiplies the automatic fit
+Rayfield:GetUIScale()      -- effective scale right now
+```
+
+Both methods also exist on the window handle.
 
 ## Icons
 

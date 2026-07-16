@@ -67,6 +67,20 @@ The window handle exposes everything you need at runtime.
 | `Navigate(tab)` | Jump to a tab by its handle or name. |
 | `Unload()` | Destroy the interface. |
 
+### Scale
+
+The interface sizes itself to the screen. On phones and other small viewports it shrinks automatically so the whole window stays reachable, and the player can adjust it further with the UI scale slider in the settings page.
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `SetUIScale(factor)` | | Multiply the automatic scale. `1` is neutral, `0.8` renders everything at 80 percent. |
+| `GetUIScale()` | number | The effective scale currently applied, automatic fit included. |
+
+```lua
+window:SetUIScale(0.9)
+print(window:GetUIScale())
+```
+
 ### Theme and language
 
 | Method | Description |
